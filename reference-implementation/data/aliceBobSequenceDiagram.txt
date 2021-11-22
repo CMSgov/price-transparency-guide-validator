@@ -1,0 +1,7 @@
+title Alice and Bob
+
+participant Bob 
+participant Alice
+
+Alice->Bob: Authentication Request
+Bob->Alice: Authentication Response
