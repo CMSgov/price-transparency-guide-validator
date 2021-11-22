@@ -1,0 +1,3 @@
+title Sample Sequence Diagram
+Alice->Bob:Authentication Request
+Bob->Alice:Authentication Response

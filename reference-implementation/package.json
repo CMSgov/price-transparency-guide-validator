@@ -1,0 +1,34 @@
+{
+    "name": "bento-box",
+    "version": "1.0.0",
+    "description": "",
+    "main": "bin/index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "Abigail Watson <awatson@mitre.org>",
+    "license": "MIT",
+    "bin": {
+        "bento-box": "./bin/index.js"
+    },
+    "dependencies": {
+        "axios": "^0.21.1",
+        "bento-box-npm": "file:../bento-box-npm",
+        "bluebird": "^3.7.2",
+        "boxen": "4.0",
+        "chalk": "2.4",
+        "fhir": "^4.10.0",
+        "line-reader": "^0.4.0",
+        "readline": "^1.3.0",
+        "yargs": "13.2"
+    },
+    "devDependencies": {
+        "@babel/cli": "^7.15.4",
+        "@babel/core": "^7.15.5",
+        "@babel/helper-compilation-targets": "^7.15.4",
+        "@babel/node": "^7.15.4",
+        "@babel/preset-env": "^7.15.6"
+    },
+    "type": "commonjs"
+}
