@@ -27,6 +27,10 @@ price-validator --validate ../data-files/allowed-amounts.json
 
 # validate a broken file
 price-validator --validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
+
+# generate a ndjson file  
+price-validator --generate ../output/allowed-amounts.ndjson --lines 10
+
 ```
 
 #### References  

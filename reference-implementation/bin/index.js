@@ -135,21 +135,54 @@ if(options.validate){
                     console.log('==============================================================')
                 });
             }
-
-
-
-            // if(options["output"]){                
-            //     fs.writeFile(options["output"], Buffer.from(JSON.stringify(jsonObject, null, 2)), err => {
-            //         if (err) {
-            //             console.error(err)
-            //             return
-            //         }
-            //     })
-            // } else {
-
-
-            //     console.log(jsonObject);
-            // }
-          })    
+        })    
     }
 }
+
+
+if(options["generate"]){                
+    let schemaTemplate = {
+        "reporting_entity_name": "medicare",
+        "reporting_entity_type": "medicare",
+        "reporting_plans":[{
+          "plan_name": "medicare",
+          "plan_id_type": "hios",
+          "plan_id": "11111111111",
+          "plan_market_type": "individual"
+        }],
+        "last_updated_on": "2020-08-27",
+        "version": "1.0.0",
+        "out_of_network":[]
+    };
+
+    let lineCount = 1;
+    if(options["lines"]){    
+        lineCount = options["lines"];
+    }
+
+    let ndJsonString = "";
+
+    for (let index = 0; index < lineCount; index++) {
+        ndJsonString += JSON.stringify(schemaTemplate) + "\n"    
+
+        if(options["debug"]){
+            if(index % 10 === 0){
+                console.log(index)
+            }
+        }
+        if(options["trace"]){
+            console.log(ndJsonString)
+        }    
+    }
+    if(options["debug"]){
+        console.log("Finished: " + lineCount);
+    }
+
+
+    fs.writeFile(options["generate"], Buffer.from(ndJsonString), err => {
+        if (err) {
+            console.error(err)
+            return
+        }
+    })
+} 
