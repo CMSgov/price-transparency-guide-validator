@@ -1,0 +1,1 @@
+{"version":3,"file":"math-random.d.ts","sourceRoot":"","sources":["../../../src/generators/math-random.ts"],"names":[],"mappings":"AAAA,OAAO,GAAG,MAAM,QAAQ,CAAA;AAExB,MAAM,CAAC,OAAO,OAAO,aAAc,SAAQ,GAAG;IAC5C,IAAI,IAAI,WAEP;IAED,IAAI;IAKJ,IAAI,CAAC,KAAK,EAAE,OAAO,EAAE,KAAK,EAAE,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC;IAInD,KAAK;CAGN"}

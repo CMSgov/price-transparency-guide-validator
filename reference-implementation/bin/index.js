@@ -9,6 +9,10 @@ let boxen = require("boxen");
 let yargs = require("yargs");
 let axios = require("axios");
 
+let Ajv = require("ajv")
+const ajv = new Ajv({allErrors: true}) // options can be passed, e.g. {allErrors: true}
+
+
 let lineReader = require('line-reader');
 let readline = require('readline');
 let Promise = require('bluebird');
@@ -29,6 +33,7 @@ const options = yargs
  .option("validate", { describe: "Validate JSON file" })
  .option("stream", { describe: "Stream file and validate each line (NDJSON)" })
  .option("generate", { describe: "Generate sample NDJSON file." })
+ .option("debug", { describe: "Include debugging info" })
  .argv;
 
 
@@ -74,12 +79,13 @@ if(options.readfile){
 
 if(options.validate){
     if(typeof options.validate === "string"){
+
         fs.readFile(options.validate, 'utf8' , (err, data) => {
             if (err) {
               console.error(err)
               return
             }
-            console.log('Reading file....')
+            console.log('Validate file....')
 
             let parsedData;
             if(typeof data === "string"){
@@ -88,17 +94,62 @@ if(options.validate){
                 parsedData = data;
             }
             
-            let jsonObject = {};
-            if(options["output"]){                
-                fs.writeFile(options["output"], Buffer.from(JSON.stringify(jsonObject, null, 2)), err => {
+            let jsonObject = parsedData;
+
+            let schema;
+            if(typeof options.schema === "string"){
+                fs.readFile(options.schema, 'utf8' , (err, schemaData) => {
                     if (err) {
-                        console.error(err)
-                        return
+                      console.error(err)
+                      return
                     }
-                })
-            } else {
-                console.log(jsonObject);
+
+
+                    console.log('==============================================================')
+
+                    if(options.debug){
+                        console.log('Fetching schema....')
+                        console.log(schemaData)
+                        console.log('')
+                        console.log('--------------------------------------------------------------')
+                        console.log('')
+                        console.log('JSON file.......')
+                        console.log(jsonObject)
+                        console.log('')
+                        console.log('--------------------------------------------------------------')
+                        console.log('')    
+                    }
+
+                    const validate = ajv.compile(JSON.parse(schemaData));
+                    const valid = validate(jsonObject);
+
+                    if (!valid){
+                        // const errors = await this.parseErrors(validate.errors);
+                        // throw errors;
+
+                        console.log(ajv.errorsText(validate.errors, {
+                            separator: '\n'
+                        }))                        
+                    }
+
+                    console.log('==============================================================')
+                });
             }
+
+
+
+            // if(options["output"]){                
+            //     fs.writeFile(options["output"], Buffer.from(JSON.stringify(jsonObject, null, 2)), err => {
+            //         if (err) {
+            //             console.error(err)
+            //             return
+            //         }
+            //     })
+            // } else {
+
+
+            //     console.log(jsonObject);
+            // }
           })    
     }
 }
