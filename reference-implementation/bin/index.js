@@ -12,6 +12,7 @@ let axios = require("axios");
 let Ajv = require("ajv")
 const ajv = new Ajv({allErrors: true}) // options can be passed, e.g. {allErrors: true}
 
+const ndjson = require('ndjson')
 
 let lineReader = require('line-reader');
 let readline = require('readline');
@@ -31,8 +32,8 @@ const options = yargs
  .option("fetch", { describe: "Fetch a URL" })
  .option("readfile", { describe: "Read file" })
  .option("validate", { describe: "Validate JSON file" })
- .option("stream", { describe: "Stream file and validate each line (NDJSON)" })
  .option("generate", { describe: "Generate sample NDJSON file." })
+ .option("stream", { describe: "Stream file and validate each line (NDJSON)" })
  .option("debug", { describe: "Include debugging info" })
  .argv;
 
@@ -96,14 +97,12 @@ if(options.validate){
             
             let jsonObject = parsedData;
 
-            let schema;
             if(typeof options.schema === "string"){
                 fs.readFile(options.schema, 'utf8' , (err, schemaData) => {
                     if (err) {
                       console.error(err)
                       return
                     }
-
 
                     console.log('==============================================================')
 
@@ -178,7 +177,6 @@ if(options["generate"]){
         console.log("Finished: " + lineCount);
     }
 
-
     fs.writeFile(options["generate"], Buffer.from(ndJsonString), err => {
         if (err) {
             console.error(err)
@@ -186,3 +184,98 @@ if(options["generate"]){
         }
     })
 } 
+
+
+if(options["stream"]){
+    if(typeof options.stream === "string"){
+
+        console.log("Streaming file: " + options.stream);
+        console.log('==============================================================')
+
+        if(typeof options.schema === "string"){
+            fs.readFile(options.schema, 'utf8' , (err, schemaData) => {
+                if (err) {
+                  console.error(err)
+                  return
+                }
+
+                if(options.debug){
+                    console.log('Fetching schema....')
+                    console.log(schemaData)
+                    console.log('')
+                    console.log('--------------------------------------------------------------')
+                    console.log('')
+                }
+
+                const validate = ajv.compile(JSON.parse(schemaData));
+
+                let writeStream;
+
+                if(typeof options.save === "string"){
+                    writeStream = fs.createWriteStream(options.save, {
+                        flags: "w",
+                        encoding: "utf8",
+                        mode: 0o666,
+                        autoClose: true,
+                        emitClose: true,
+                        start: 0
+                    });
+                    writeStream.on("open", () => {
+                        console.log("Stream opened");
+                    });
+                    writeStream.on("ready", () => {
+                        console.log("Stream ready");
+                    });
+                    writeStream.on("pipe", src => {
+                        console.log(src);
+                    });
+                    writeStream.on("unpipe", src => {
+                        console.log(src);
+                    });
+                    writeStream.on('finish', () => {
+                        console.error('All writes are now complete.');
+                    });  
+                }
+
+                let index = 0;
+                fs.createReadStream(options.stream)
+                    .pipe(ndjson.parse())
+                    .on('data', function(jsonObject) {
+                        index++;
+                        const valid = validate(jsonObject);
+
+                        if (!valid){
+                            // const errors = await this.parseErrors(validate.errors);
+                            // throw errors;
+
+
+                            if(options["save"]){
+                                writeStream.write('Row Index: ' + index + '\n');
+                                writeStream.write(ajv.errorsText(validate.errors, {
+                                    separator: '\n'
+                                }));
+                                writeStream.write('\n\n');
+                            } else {
+                                console.log('Record Index: ' + index);
+                                console.log(ajv.errorsText(validate.errors, {
+                                    separator: '\n'
+                                }))                        
+                                console.log('');    
+                            }
+                        }
+                    })
+                    .on('finish', function(){
+                        console.error('All writes are now complete.');
+                        // writeStream.finish();
+                    })
+
+            });
+        } else {
+            console.log('Please use --schema to specify a schema to match against.')
+        }
+
+
+       
+
+    }
+}
