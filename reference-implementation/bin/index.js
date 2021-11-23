@@ -20,42 +20,20 @@ var fhir = new Fhir();
 // import yargs from "yargs";
 // import axios frofm "axios";
 
-// import add from "./sum.mjs"; //ES6 import
-// import { FhirFoundryUtilities } from 'bento-box-npm/bundle.js'; // works when distributed via npm
-let { FhirFoundryUtilities } = require('bento-box-npm/dist/bundle.js');
-
 const options = yargs
  .usage("Usage: -n <name>")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
- .option("name", { describe: "Your name", type: "string" })
+ .option("echo", { describe: "Echo", type: "string" })
  .option("fetch", { describe: "Fetch a URL" })
- .option("operator", { describe: "Add two numbers together (a,b)", type: "string" })
- .option("a", { describe: "First", type: "number" })
- .option("b", { describe: "Second", type: "number" })
- .option("ping", { describe: "Ping" })
  .option("readfile", { describe: "Read file" })
- .option("sequencediagram", { describe: "Generate sequence diagram text" })
- .option("generate-fhir-from-sequence", { describe: "Generate FHIR resources from sequence diagram" })
- .option("generate-settings", { describe: "Generate settings file for Node on FHIR" })
- .option("convert-to-json", { describe: "Convert file from XML to JSON" })
+ .option("validate", { describe: "Validate JSON file" })
+ .option("stream", { describe: "Stream file and validate each line (NDJSON)" })
+ .option("generate", { describe: "Generate sample NDJSON file." })
  .argv;
 
 
-if(options.operator){
-    switch (options.operator) {
-        case "add":
-            if(options.a && options.b){
-                console.log('add!', FhirFoundryUtilities.add(options.a, options.b)) 
-            }
-            break;
-        default:
-            break;
-    }
-           
-}
-
-if(options.name){
-    const greeting = `Hello, ${options.name}!`;
+if(options.echo){
+    const greeting = `${options.echo}!`;
 
     const boxenOptions = {
      padding: 1,
@@ -77,9 +55,9 @@ if(options.fetch){
     });   
 }
 
-if(options.ping){
-    console.log(FhirFoundryUtilities.ping(options.ping))
-}
+// if(options.ping){
+//     console.log(FhirFoundryUtilities.ping(options.ping))
+// }
 
 if(options.readfile){
     if(typeof options.readfile === "string"){
@@ -94,9 +72,9 @@ if(options.readfile){
     }
 }
 
-if(options.sequencediagram){
-    if(typeof options.sequencediagram === "string"){
-        fs.readFile(options.sequencediagram, 'utf8' , (err, data) => {
+if(options.validate){
+    if(typeof options.validate === "string"){
+        fs.readFile(options.validate, 'utf8' , (err, data) => {
             if (err) {
               console.error(err)
               return
@@ -109,169 +87,18 @@ if(options.sequencediagram){
             } else if(typeof data === "object"){
                 parsedData = data;
             }
-
-
-            // const boxenOptions = {
-            //     padding: 1,
-            //     margin: 1,
-            //     borderStyle: "round",
-            //     borderColor: "green"
-            //    };
-            // const msgBox = boxen(FhirFoundryUtilities.generateWebSequenceDiagramFile(parsedData), boxenOptions );
-               
-            // console.log(msgBox); 
             
-            if(options["output"]){
-                fs.writeFile(options["output"], Buffer.from(JSON.stringify(FhirFoundryUtilities.generateWebSequenceDiagramFile(parsedData), null, 2)), err => {
+            let jsonObject = {};
+            if(options["output"]){                
+                fs.writeFile(options["output"], Buffer.from(JSON.stringify(jsonObject, null, 2)), err => {
                     if (err) {
                         console.error(err)
                         return
                     }
-                    //file written successfully
-                    })
+                })
             } else {
-                console.log(FhirFoundryUtilities.generateWebSequenceDiagramFile(parsedData));
+                console.log(jsonObject);
             }
           })    
-    }
-}
-
-
-if(options["generate-fhir-from-sequence"]){
-    if(typeof options["generate-fhir-from-sequence"] === "string"){
-        fs.readFile(options["generate-fhir-from-sequence"], 'utf8' , (err, data) => {
-            if (err) {
-              console.error(err)
-              return
-            }
-            console.log('Reading file....')
-
-            let parsedData;
-
-            const boxenOptions = {
-                padding: 1,
-                margin: 1,
-                borderStyle: "round",
-                borderColor: "green"
-               };
-
-            if(typeof data === "string"){
-                // apparently not, lets parse it like a sequence diagram file
-                //parsedData = data;
-                
-                let resultsArray = [];
-                //Without new Promise, this throwing will throw an actual exception
-                var eachLine = Promise.promisify(lineReader.eachLine);
-                eachLine(options["generate-fhir-from-sequence"], function(line) {
-                    console.log('line: ' + line);
-                    if(line.length > 0){
-                        resultsArray.push(line);                                                
-                    }
-                }).then(function() {
-                    if(options["output"]){
-                        fs.writeFile(options["output"], Buffer.from(JSON.stringify(FhirFoundryUtilities.parseSequenceDiagramIntoBundle(resultsArray), null, 2)), err => {
-                            if (err) {
-                                console.error(err)
-                                return
-                            }
-                            //file written successfully
-                            })
-                    } else {
-                        console.log(FhirFoundryUtilities.parseSequenceDiagramIntoBundle(resultsArray));
-                    }
-                }).catch(function(err) {
-                    console.error(err);
-                });
-            }
-          })    
-    }
-}
-
-
-if(options["generate-settings"]){
-    if(typeof options["generate-settings"] === "string"){
-        fs.readFile(options["generate-settings"], 'utf8' , (err, data) => {
-            if (err) {
-              console.error(err)
-              return
-            }
-            console.log('Reading file....')
-
-            let parsedData;
-            let msgBox = "";
-
-            let boxenOptions = {
-                padding: 1,
-                margin: 1,
-                borderStyle: "round",
-                borderColor: "green"
-               };
-
-            
-            if(typeof data === "string"){
-                // apparently not, lets parse it like a sequence diagram file
-                //parsedData = data;
-                
-                let resultsArray = [];
-                //Without new Promise, this throwing will throw an actual exception
-                var eachLine = Promise.promisify(lineReader.eachLine);
-                eachLine(options["generate-settings"], function(line) {
-                    console.log('line: ' + line);
-                    if(line.length > 0){
-                        resultsArray.push(line);                                                
-                    }
-                }).then(function() {
-                    if(options["output"]){
-                        fs.writeFile(options["output"], Buffer.from(JSON.stringify(FhirFoundryUtilities.parseSequenceDiagramIntoSettingsFile(resultsArray), null, 2)), err => {
-                            if (err) {
-                                console.error(err)
-                                return
-                            }
-                            //file written successfully
-                            })
-                    } else {
-                        console.log(FhirFoundryUtilities.parseSequenceDiagramIntoSettingsFile(resultsArray));
-                    }
-                }).catch(function(err) {
-                    console.error(err);
-                });
-            }
-          })    
-    }
-}
-
-
-if(options["convert-to-json"]){
-    if(typeof options["convert-to-json"] === "string"){
-        fs.readFile(options["convert-to-json"], 'utf8' , (err, xml) => {
-            if (err) {
-              console.error(err)
-              return
-            }
-            console.log('Reading file....')
-
-            let boxenOptions = {
-                padding: 1,
-                margin: 1,
-                borderStyle: "round",
-                borderColor: "green"
-               };
-
-            console.log('xml', xml)
-            var json = fhir.xmlToJson(xml);
-            console.log('json', json)
-
-            if(options["output"]){
-                fs.writeFile(options["output"], json, err => {
-                    if (err) {
-                        console.error(err)
-                        return
-                    }
-                    //file written successfully
-                    })
-            } else {
-                console.log('json', json)
-            }
-        })    
     }
 }

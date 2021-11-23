@@ -1055,32 +1055,6 @@
     "mixin-deep" "^1.2.0"
     "pascalcase" "^0.1.1"
 
-"bento-box-npm@file:../bento-box-npm":
-  "resolved" "file:../bento-box-npm"
-  "version" "0.0.1"
-  dependencies:
-    "@babel/core" "^7.12.9"
-    "@babel/node" "^7.12.6"
-    "@babel/plugin-transform-runtime" "^7.12.1"
-    "@babel/preset-env" "^7.12.7"
-    "@babel/preset-react" "^7.14.5"
-    "@babel/runtime" "^7.12.5"
-    "babel-loader" "^8.0.6"
-    "bluebird" "^3.7.2"
-    "line-reader" "^0.4.0"
-    "lodash" "4.17.20"
-    "lodash-es" "4.17.15"
-    "moment" "2.24.0"
-    "prop-types" "15.7.2"
-    "random" "^3.0.6"
-    "react-proptypes" "^1.0.0"
-    "regjsparser" "0.6.4"
-    "rollup-plugin-commonjs" "^10.1.0"
-    "typescript" "^4.0.3"
-    "yarn" "^1.22.11"
-  optionalDependencies:
-    "fsevents" "2.2.1"
-
 "binary-extensions@^1.0.0":
   "integrity" "sha512-Un7MIEDdUC5gNpcGDV97op1Ywk748MpHcFTHoYs6qnj1Z3j7I53VG3nwZhKzoBZmbdRNnb6WRdFlwl7tSDuZGw=="
   "resolved" "https://registry.npmjs.org/binary-extensions/-/binary-extensions-1.13.1.tgz"
