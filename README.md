@@ -20,7 +20,22 @@ npm install -g .
 
 ```bash
 # most recent instructions
-bento-box --help
+price-validator --help
+
+# read a file
+price-validator --validate ../data-files/allowed-amounts.json
+
+# validate a broken file
+price-validator --validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
+
+# generate an ndjson file  
+price-validator --generate ../output/allowed-amounts.ndjson --lines 100
+
+# stream an ndjson file and validate along the way
+price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json 
+
+# stream an ndjson file, validate, and output the results into a separate file
+price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json --save ../output/errors.txt  
 ```
 
 ### Compiling Documentation  
