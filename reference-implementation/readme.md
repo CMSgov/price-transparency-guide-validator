@@ -42,3 +42,5 @@ price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/al
 
 https://developer.okta.com/blog/2019/06/18/command-line-app-with-nodejs  
 https://medium.com/nsoft/using-ajv-for-schema-validation-with-nodejs-1dfef0a372f8  
+https://nodejs.org/en/knowledge/advanced/streams/how-to-use-fs-create-read-stream/  
+https://nodejs.org/en/knowledge/advanced/streams/how-to-use-fs-create-write-stream/  
