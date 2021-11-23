@@ -20,7 +20,7 @@ npm install -g .
 
 ```bash
 # most recent instructions
-bento-box --help
+price-validator --help
 ```
 
 #### References  

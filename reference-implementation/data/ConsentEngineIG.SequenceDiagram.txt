@@ -1,8 +1,0 @@
-title Alice and Bob
-
-participant ACME Health 
-participant CMS Sandbox 
-
-ACME Health->>CMS Sandbox: /metadata
-ACME Health->>CMS Sandbox: /Patient
-ACME Health->>CMS Sandbox: /Consent?subject=Patient/{patientId}
