@@ -38,6 +38,14 @@ price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/al
 price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json --save ../output/errors.txt  
 ```
 
+### Testing  
+
+```bash
+# alias for mocha.js  
+npm test
+
+```
+
 ### Compiling Documentation  
 
 ```bash 
