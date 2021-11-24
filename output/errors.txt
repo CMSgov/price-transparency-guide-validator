@@ -1,0 +1,12 @@
+Row Index: 3
+data must have required property 'reporting_plans'
+
+Row Index: 5
+data must have required property 'reporting_entity_type'
+
+Row Index: 11
+data must have required property 'reporting_entity_name'
+
+Row Index: 20
+data/reporting_plans/0 must have required property 'plan_id_type'
+
