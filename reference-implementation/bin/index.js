@@ -14,6 +14,11 @@ const ajv = new Ajv({allErrors: true}) // options can be passed, e.g. {allErrors
 
 const ndjson = require('ndjson');
 
+
+let compress = require('compress-json').compress;
+let decompress = require('compress-json').decompress;
+let jsonpack = require('jsonpack/main')
+
 let lineReader = require('line-reader');
 let readline = require('readline');
 let Promise = require('bluebird');
@@ -35,11 +40,11 @@ const options = yargs
  .option("generate",   { describe: "Generate sample NDJSON file." })
  .option("stream",     { describe: "Stream file and validate each line (NDJSON)" })
  .option("compress",   { describe: "Compress the JSON record." })
- .option("decompress", { describe: "Decompress the JSON record." })
+//  .option("decompress", { describe: "Decompress the JSON record." })
  .option("pack",       { describe: "Pack the JSON record." })
- .option("unpack",     { describe: "Unpack the JSON record." })
+//  .option("unpack",     { describe: "Unpack the JSON record." })
  .option("minify",     { describe: "Minify the JSON record with a specific mapping file." })
- .option("unminify",   { describe: "Unminify the JSON record." })
+//  .option("unminify",   { describe: "Unminify the JSON record." })
  .option("debug",      { describe: "Include debugging info" })
  .argv;
 
@@ -60,8 +65,8 @@ if(options.echo){
 }
 
 
-if(options.fetch){
-    axios.get(options.url, { headers: { Accept: "application/json" } })
+if(options["fetch"]){
+    axios.get(options["url"], { headers: { Accept: "application/json" } })
     .then(res => {
       console.log(res.data);
     });   
@@ -71,9 +76,9 @@ if(options.fetch){
 //     console.log(FhirFoundryUtilities.ping(options.ping))
 // }
 
-if(options.readfile){
-    if(typeof options.readfile === "string"){
-        fs.readFile(options.readfile, 'utf8' , (err, data) => {
+if(options["readfile"]){
+    if(typeof options["readfile"] === "string"){
+        fs.readFile(options["readfile"], 'utf8' , (err, data) => {
             if (err) {
               console.error(err)
               return
@@ -84,10 +89,10 @@ if(options.readfile){
     }
 }
 
-if(options.validate){
-    if(typeof options.validate === "string"){
+if(options["validate"]){
+    if(typeof options["validate"] === "string"){
 
-        fs.readFile(options.validate, 'utf8' , (err, data) => {
+        fs.readFile(options["validate"], 'utf8' , (err, data) => {
             if (err) {
               console.error(err)
               return
@@ -112,7 +117,7 @@ if(options.validate){
 
                     console.log('==============================================================')
 
-                    if(options.debug){
+                    if(options["debug"]){
                         console.log('Fetching schema....')
                         console.log(schemaData)
                         console.log('')
@@ -205,7 +210,7 @@ if(options["stream"]){
                   return
                 }
 
-                if(options.debug){
+                if(options["debug"]){
                     console.log('Fetching schema....')
                     console.log(schemaData)
                     console.log('')
@@ -283,5 +288,139 @@ if(options["stream"]){
 
        
 
+    }
+}
+
+
+if(options["compress"]){
+    if(typeof options["compress"] === "string"){
+
+        fs.readFile(options["compress"], 'utf8' , (err, data) => {
+            if (err) {
+              console.error(err)
+              return
+            }
+            console.log('Compressing file....')
+
+            let parsedData;
+            if(typeof data === "string"){
+                parsedData = JSON.parse(data);
+            } else if(typeof data === "object"){
+                parsedData = data;
+            }
+            
+            let compressed = compress(parsedData)
+
+            console.log('typeof compressed', typeof compressed)
+            console.log('compressed', compressed)
+
+            if(options["save"] && compressed){
+                fs.writeFile(options["save"], Buffer.from(compressed), err => {
+                    if (err) {
+                        console.error(err)
+                        return
+                    }
+                })    
+            }
+        })    
+    }
+}
+
+if(options["pack"]){
+    if(typeof options["pack"] === "string"){
+
+        fs.readFile(options["pack"], 'utf8' , (err, data) => {
+            if (err) {
+              console.error(err)
+              return
+            }
+            console.log('Packing file....')
+
+            let parsedData;
+            if(typeof data === "string"){
+                parsedData = JSON.parse(data);
+            } else if(typeof data === "object"){
+                parsedData = data;
+            }
+            
+            let packed = jsonpack.pack(parsedData)
+
+            console.log('typeof packed', typeof packed)
+            console.log('packed', packed)
+
+            if(options["save"] && packed){
+                fs.writeFile(options["save"], Buffer.from(packed), err => {
+                    if (err) {
+                        console.error(err)
+                        return
+                    }
+                })    
+            }
+        })    
+    }
+}
+
+
+var specs = {
+    'reporting_entity_name': 'a',
+    'reporting_entity_type': 'b',
+    'reporting_plans': 'c',
+    'last_updated_on': 'd',
+    'version': 'e',
+    'out_of_network': 'f',
+    'plan_name': 'g',
+    'plan_id_type': 'h',
+    'plan_id': 'i',
+    'plan_market_type': 'j',
+    'name': 'k',
+    'billing_code_type': 'l',
+    'billing_code_type_version': 'm',
+    'billing_code': 'n',
+    'description': 'o',
+    'allowed_amounts': 'p',
+    "tin": 'q',
+    'type': 'r',
+    'value': 's',
+    'service_code': 't',
+    'billing_class': 'u',
+    'payments': 'v',
+    'providers': 'w',
+    'billed_charge': 'x',
+    'npi': 'y'
+  };
+var minifier = require('json-minifier')(specs);
+
+
+if(options["minify"]){
+    if(typeof options["minify"] === "string"){
+
+        fs.readFile(options["minify"], 'utf8' , (err, data) => {
+            if (err) {
+              console.error(err)
+              return
+            }
+            console.log('Minifying file....')
+
+            let parsedData;
+            if(typeof data === "string"){
+                parsedData = JSON.parse(data);
+            } else if(typeof data === "object"){
+                parsedData = data;
+            }
+            
+            let minified = minifier.minify(parsedData)
+
+            console.log('typeof minified', typeof minified)
+            console.log('minified', minified)
+
+            if(options["save"] && minified){
+                fs.writeFile(options["save"], Buffer.from(minified), err => {
+                    if (err) {
+                        console.error(err)
+                        return
+                    }
+                })    
+            }
+        })    
     }
 }
