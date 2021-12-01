@@ -1,0 +1,18 @@
+{
+  "node": true,
+  "jasmine": true,
+  "curly": false,
+  "quotmark": "single",
+  "maxcomplexity": 8,
+  "unused": true,
+  "globals": {
+    "after": true,
+    "afterEach": true,
+    "assert": true,
+    "before": true,
+    "beforeEach": true,
+    "describe": true,
+    "expect": true,
+    "it": true
+  }
+}
