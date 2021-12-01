@@ -12,7 +12,7 @@ let axios = require("axios");
 let Ajv = require("ajv")
 const ajv = new Ajv({allErrors: true}) // options can be passed, e.g. {allErrors: true}
 
-const ndjson = require('ndjson')
+const ndjson = require('ndjson');
 
 let lineReader = require('line-reader');
 let readline = require('readline');
@@ -28,13 +28,19 @@ var fhir = new Fhir();
 const options = yargs
  .usage("Usage: -n <name>")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
- .option("echo", { describe: "Echo", type: "string" })
- .option("fetch", { describe: "Fetch a URL" })
- .option("readfile", { describe: "Read file" })
- .option("validate", { describe: "Validate JSON file" })
- .option("generate", { describe: "Generate sample NDJSON file." })
- .option("stream", { describe: "Stream file and validate each line (NDJSON)" })
- .option("debug", { describe: "Include debugging info" })
+ .option("echo",       { describe: "Echo", type: "string" })
+ .option("fetch",      { describe: "Fetch a URL" })
+ .option("readfile",   { describe: "Read file" })
+ .option("validate",   { describe: "Validate JSON file" })
+ .option("generate",   { describe: "Generate sample NDJSON file." })
+ .option("stream",     { describe: "Stream file and validate each line (NDJSON)" })
+ .option("compress",   { describe: "Compress the JSON record." })
+ .option("decompress", { describe: "Decompress the JSON record." })
+ .option("pack",       { describe: "Pack the JSON record." })
+ .option("unpack",     { describe: "Unpack the JSON record." })
+ .option("minify",     { describe: "Minify the JSON record with a specific mapping file." })
+ .option("unminify",   { describe: "Unminify the JSON record." })
+ .option("debug",      { describe: "Include debugging info" })
  .argv;
 
 
