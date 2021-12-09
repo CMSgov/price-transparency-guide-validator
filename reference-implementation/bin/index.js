@@ -22,6 +22,7 @@ var set = require('lodash/set');
 var dropRight = require('lodash/dropRight');
 var takeRight = require('lodash/takeRight');
 var join = require('lodash/join');
+var replace = require('lodash/replace');
 
 
 let compress = require('compress-json').compress;
@@ -383,8 +384,30 @@ if(options["walk"]){
     if(typeof options["walk"] === "string"){
 
         console.log("walking file: " + options["walk"]);
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+
         console.log('===================================================================================================')
         console.log('===================================================================================================')
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        console.log("")
+        
 
         let writeStream;
         if(typeof options["save"] === "string"){
@@ -430,14 +453,29 @@ if(options["walk"]){
             // lastPropertyBase = lastProperty;
 
 
-            lastPropertyBase = lastProperty;
 
             if(lastPropertyBase.length === 0){
-                
+                lastPropertyBase = lastProperty;                
                 set(rootObject, lastProperty, [])
+
             } else {
-                set(rootObject, lastPropertyBase, [])                
+                
+                // <---
+
+                let existingObject = get(rootObject, lastPropertyBase, [])
+                console.log('existingObject        : ', existingObject)
+                
+                if(Array.isArray(existingObject)){
+                    existingObject[existingObject.length - 1][lastProperty] = [];
+                    lastPropertyBase = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
+                } else {
+                    lastPropertyBase = lastPropertyBase + "[" + (existingObject.length)  + "]." + lastProperty;
+                    set(rootObject, lastPropertyBase, [])     
+                }
             }
+
+            // ????
+            lastProperty = "";
 
             console.log('lastProperty          : ', lastProperty);
             console.log('lastPropertyBase      : ', lastPropertyBase);
@@ -449,24 +487,64 @@ if(options["walk"]){
             console.log('lastProperty          : ', lastProperty);
             console.log('lastPropertyBase      : ', lastPropertyBase);
 
-            if(typeof rootObject === "object"){
-                console.log('setting property base : ' + lastPropertyBase);
-                
-                let existingObject = get(rootObject, lastPropertyBase, [])
-                console.log('existingObject        : ', existingObject);
+            let assigningPath = "";
 
-                let assigningPath = "";
+            // tree branch
+            if(typeof rootObject === "object"){
+                // grab the branch path
+                console.log('setting property base : ', lastPropertyBase);
                 
-                if(lastPropertyBase.length > 0){
-                    assigningPath = lastPropertyBase + "[" + existingObject.length + "]"
-                } else {
-                    assigningPath = lastProperty + "[" + existingObject.length + "]"
-                }
+                // no existing path, so whatever we assign 
+                // will be based on the last property found
+                if(lastPropertyBase.length === 0){
+                    assigningPath = lastProperty;
+
+                // we have an existing lastPropertyBase; time to parse it
+                } else if(lastPropertyBase.length > 0){                  
+                    
+                    // let's pluck the existing branch, and see what currently exists
+                    let existingObject = get(rootObject, lastPropertyBase)
+                    console.log('existingObject        : ', existingObject);
+                    
+                    
+
+                    // if nothing exists, we assume we can assign directly to the path
+                    if(!existingObject){
+
+                        // do we need to add the lastProperty?
+                        assigningPath = lastPropertyBase;
+
+                    // if it does exists, then lets check that it's an array
+                    } else if(Array.isArray(existingObject)){
+                        console.log('existingObject.length : ', existingObject.length);
+
+                        // how many objects are in the existing array?
+                        if(existingObject.length === 0){
+                            // it is an array, but  nothing assigned yet; still at first level 
+                            // subobject doesnt exist yet, so assigning an index of 0
+                            assigningPath = lastPropertyBase + "[0]"
+                        } else if(existingObject.length > 0){                        
+
+                            if(existingObject.length > 0){
+                                // found an existing object in the array
+                                assigningPath = lastPropertyBase + "[" + existingObject.length + "]"
+                            } 
+                        } 
+                    } else {
+                        assigningPath = lastPropertyBase + "." + lastProperty;
+                        lastPropertyBase = assigningPath;
+                    }                    
+                } 
+
+
+
+
 
                 console.log('assigningPath         : ', assigningPath);
                 
                 set(rootObject, assigningPath, {});
-
+            
+            // root node
             } else if(typeof rootObject === "undefined"){
                 rootObject = {};
             }
@@ -493,36 +571,69 @@ if(options["walk"]){
                 set(rootObject, lastProperty, value)
             } else {
                 let existingObject = get(rootObject, lastPropertyBase, [])
-                console.log('existingObject', existingObject)
+                console.log('existingObject        : ', existingObject);
+                
 
-                let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
-                console.log('newPath', newPath);
+                let assigningPath = "";
 
-                set(rootObject, newPath, value);
+                if(Array.isArray(existingObject)){
+
+                    console.log('typeof existingObject[0]', typeof existingObject[0])
+                    if(["string", "undefined"].includes(typeof existingObject[0])){
+                        existingObject.push(value);
+                    } else if (typeof existingObject[0] === "object"){
+                        assigningPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
+                        console.log('assigningPath         : ', assigningPath)    
+                        set(rootObject, assigningPath, value);
+                    }
+
+
+                } else {
+                    assigningPath = lastPropertyBase + "." + lastProperty;
+                    set(rootObject, assigningPath, value);
+                }
+
+                console.log('assigningPath         : ', assigningPath);                
             }
             // console.log('rootObject', JSON.stringify(rootObject));
         });
         emitter.on(bfj.events.number, function(value){ 
             console.log('bfj.events.number     : ', value)
-
-            // stack[stack.length - 1][lastProperty] = value
-            // rootObject[lastProperty] = value;
-            // set(rootObject, lastPropertyBase + '.' + lastProperty, value)
+            console.log('lastPropertyBase      : ', lastPropertyBase);
 
             if(lastPropertyBase.length === 0){
                 set(rootObject, lastProperty, value)
             } else {
-                let existingObject = get(rootObject, lastPropertyBase, [])
-                console.log('existingObject', existingObject)
 
-                let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
-                console.log('newPath', newPath);
 
-                set(rootObject, newPath, value);
+                let existingObject = get(rootObject, lastPropertyBase)
+                console.log('lastPropertyBase.isArray', Array.isArray(existingObject));
+
+
+                if(Array.isArray(existingObject)){
+                    console.log('typeof existingObject[0]', typeof existingObject[0])
+                    if(["number", "undefined"].includes(typeof existingObject[0])){
+                        existingObject.push(value);
+                    } else if (typeof existingObject[0] === "object"){
+                        let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
+                        console.log('newPath', newPath)    
+                        set(rootObject, newPath, value);
+                    }
+
+                } else {
+                    
+                    set(rootObject, lastPropertyBase + "." + lastProperty, value);
+                }
+                // console.log('existingObject', existingObject)
+
+                // let newPath = lastPropertyBase + "[" + (existingObject.length)  + "]." + lastProperty;
+                // console.log('newPath', newPath);
+
             }
+            console.log('rootObject            : ', JSON.stringify(rootObject));
         });
         emitter.on(bfj.events.literal, function(value){ 
-            console.log('bfj.events.literal    : ', value)
+            console.log('bfj.events.literal    : ', value);
 
             // stack[stack.length - 1][lastProperty] = value
             // rootObject[lastProperty] = value;
@@ -532,7 +643,7 @@ if(options["walk"]){
                 set(rootObject, lastProperty, value)
             } else {
                 let existingObject = get(rootObject, lastPropertyBase, [])
-                console.log('existingObject', existingObject)
+                console.log('existingObject        : ', existingObject)
 
                 let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
                 console.log('newPath', newPath);
@@ -543,21 +654,103 @@ if(options["walk"]){
         emitter.on(bfj.events.endArray, function(array){
             console.log('bfj.events.endArray   : ', array);
 
-            console.log('lastPropertyBase', lastPropertyBase);
-            let pathComponents = lastPropertyBase.split(".");
-            console.log('pathComponents', pathComponents);
+            console.log('lastPropertyBase      : ', lastPropertyBase);
 
-            let lastItem = takeRight(pathComponents, 1);
-            console.log('lastItem', lastItem);
+            let existingObject = get(rootObject, lastPropertyBase)
 
-            let remainingPath = join(dropRight(pathComponents, 1), ".");
-            console.log('remainingPath', remainingPath);
+            // is the current lastPropertyBase a leaf array?
+            // and written without an index?
+            // as in the case of an array of strings or ints?
+            if(Array.isArray(existingObject)){
 
-            lastPropertyBase = remainingPath;
+                // if so, we just remove the last element
+                let pathComponents = lastPropertyBase.split(".");
+                console.log('pathComponents        : ', pathComponents);
+                
+                let lastItem = takeRight(pathComponents, 1);
+                console.log('lastItem              : ', lastItem);
+                
+                let remainingPath = join(dropRight(pathComponents, 1), ".");
+                console.log('remainingPath         : ', remainingPath);
+
+                lastPropertyBase = remainingPath;
+            } else {
+                // otherwise, treat the array as an array of object
+                // and check to remove the index brackets in the string
+                // which requires going two levels deep in the string
+                let components = lastPropertyBase.split(".");
+                console.log('components            : ', components);
+                    
+                let basePath = dropRight(components, 1);
+                console.log('basePath              : ', basePath);    
+            
+                let lastItem = replace(takeRight(basePath, 1), /\[[^\]]*\]/, "");
+                console.log('lastItem              : ', lastItem);
+
+                let essentialPath = join(dropRight(basePath, 1), ".");
+                console.log('essentialPath         : ', essentialPath);    
+
+                let remainingPath = join([essentialPath, lastItem], "."); 
+                console.log('remainingPath         : ', remainingPath);        
+
+                lastPropertyBase = remainingPath; 
+            }            
+
+            console.log('lastPropertyBase      : ', lastPropertyBase);
+            console.log('rootObject            : ', JSON.stringify(rootObject));
         });
         emitter.on(bfj.events.endObject, function(object){
             console.log('bfj.events.endObject  : ', JSON.stringify(rootObject))
-            // console.log('lastPropertyBase', lastPropertyBase)
+            console.log('lastPropertyBase      : ', lastPropertyBase);
+
+            let remainingPath = "";
+
+            let existingObject = get(rootObject, lastPropertyBase);
+            console.log('existingObject.isArray: ', Array.isArray(existingObject));
+
+            let components = lastPropertyBase.split(".");
+            console.log('components            : ', components);
+                    
+            let lastItem = takeRight(components, 1);
+            console.log('lastItem              : ', lastItem);
+
+            // is the current lastPropertyBase an object array?
+            if(Array.isArray(existingObject)){
+                // okay, we're in an object array
+                // and we're ending the object, not the array
+                // so keep the same lastPropertyBase
+                lastPropertyBase = lastPropertyBase;
+
+            } else if(lastItem[0].match(/\[[^\]]*\]/)){
+                // yup, array reference
+                // object end involves closing this out 
+                // (but not necessary closing out the array)
+
+                let scrubbedItem = replace(lastItem, /\[[^\]]*\]/, "");
+                console.log('scrubbedItem          : ', scrubbedItem);
+
+                let basePath = join(dropRight(components, 1), ".");
+                console.log('basePath              : ', basePath);     
+
+                remainingPath = join([basePath, scrubbedItem], "."); 
+                console.log('remainingPath         : ', remainingPath);        
+
+                lastPropertyBase = remainingPath;             
+
+            } else {
+                // no array reference, just removing the last item
+
+                let basePath = dropRight(components, 1);
+                console.log('basePath              : ', basePath);     
+
+                remainingPath = join(basePath, "."); 
+                console.log('remainingPath         : ', remainingPath);        
+
+                lastPropertyBase = remainingPath;             
+            }
+
+            console.log('lastPropertyBase      : ', lastPropertyBase);
+            console.log('rootObject            : ', JSON.stringify(rootObject));
         });
         emitter.on(bfj.events.error, function(error){ 
             console.log('bfj.events.error      : ', error)
