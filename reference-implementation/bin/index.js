@@ -465,7 +465,7 @@ if(options["walk"]){
                     lastPropertyBase = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
                 } else {
                     existingObject[lastProperty] = [];
-                    lastPropertyBase = lastPropertyBase + "[" + (existingObject.length)  + "]." + lastProperty;
+                    lastPropertyBase = lastPropertyBase + "." + lastProperty;
                     // set(existingObject, lastProperty, [])     
                 }
             }
@@ -726,9 +726,14 @@ if(options["walk"]){
                 console.log('scrubbedItem          : ', scrubbedItem);
 
                 let basePath = join(dropRight(components, 1), ".");
-                console.log('basePath              : ', basePath);     
+                console.log('basePath              : ', basePath);    
+                
+                if(basePath){
+                    remainingPath = join([basePath, scrubbedItem], "."); 
+                } else {
+                    remainingPath = scrubbedItem; 
+                }
 
-                remainingPath = join([basePath, scrubbedItem], "."); 
                 console.log('remainingPath         : ', remainingPath);        
 
                 lastPropertyBase = remainingPath;             
