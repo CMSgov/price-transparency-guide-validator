@@ -449,11 +449,6 @@ if(options["walk"]){
         emitter.on(bfj.events.array, function(array){
             console.log('bfj.events.array      : ', array);
 
-            // rootObject[lastProperty] = [];
-            // lastPropertyBase = lastProperty;
-
-
-
             if(lastPropertyBase.length === 0){
                 lastPropertyBase = lastProperty;                
                 set(rootObject, lastProperty, [])
@@ -469,8 +464,9 @@ if(options["walk"]){
                     existingObject[existingObject.length - 1][lastProperty] = [];
                     lastPropertyBase = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
                 } else {
+                    existingObject[lastProperty] = [];
                     lastPropertyBase = lastPropertyBase + "[" + (existingObject.length)  + "]." + lastProperty;
-                    set(rootObject, lastPropertyBase, [])     
+                    // set(existingObject, lastProperty, [])     
                 }
             }
 
