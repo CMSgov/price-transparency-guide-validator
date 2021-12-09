@@ -13,6 +13,15 @@ let Ajv = require("ajv")
 const ajv = new Ajv({allErrors: true}) // options can be passed, e.g. {allErrors: true}
 
 const ndjson = require('ndjson');
+const split2 = require('split2');
+
+const bfj = require('bfj');
+
+var get = require('lodash/get');
+var set = require('lodash/set');
+var dropRight = require('lodash/dropRight');
+var takeRight = require('lodash/takeRight');
+var join = require('lodash/join');
 
 
 let compress = require('compress-json').compress;
@@ -39,12 +48,16 @@ const options = yargs
  .option("validate",   { describe: "Validate JSON file" })
  .option("generate",   { describe: "Generate sample NDJSON file." })
  .option("stream",     { describe: "Stream file and validate each line (NDJSON)" })
+ .option("char-stream",{ describe: "Compress the JSON record into a character stream." })
  .option("compress",   { describe: "Compress the JSON record." })
 //  .option("decompress", { describe: "Decompress the JSON record." })
  .option("pack",       { describe: "Pack the JSON record." })
 //  .option("unpack",     { describe: "Unpack the JSON record." })
  .option("minify",     { describe: "Minify the JSON record with a specific mapping file." })
 //  .option("unminify",   { describe: "Unminify the JSON record." })
+ .option("stringify",     { describe: "Stringify a JSON record." })
+
+ .option("walk",     { describe: "Walk a large JSON record via a streaming channel." })
  .option("debug",      { describe: "Include debugging info" })
  .argv;
 
@@ -198,9 +211,9 @@ if(options["generate"]){
 
 
 if(options["stream"]){
-    if(typeof options.stream === "string"){
+    if(typeof options["stream"] === "string"){
 
-        console.log("Streaming file: " + options.stream);
+        console.log("Streaming file: " + options["stream"]);
         console.log('==============================================================')
 
         if(typeof options.schema === "string"){
@@ -222,8 +235,8 @@ if(options["stream"]){
 
                 let writeStream;
 
-                if(typeof options.save === "string"){
-                    writeStream = fs.createWriteStream(options.save, {
+                if(typeof options["save"] === "string"){
+                    writeStream = fs.createWriteStream(options["save"], {
                         flags: "w",
                         encoding: "utf8",
                         mode: 0o666,
@@ -249,7 +262,7 @@ if(options["stream"]){
                 }
 
                 let index = 0;
-                fs.createReadStream(options.stream)
+                fs.createReadStream(options["stream"])
                     .pipe(ndjson.parse())
                     .on('data', function(jsonObject) {
                         index++;
@@ -288,6 +301,275 @@ if(options["stream"]){
 
        
 
+    }
+}
+
+if(options["char-stream"]){
+    if(typeof options["char-stream"] === "string"){
+
+        console.log("Streaming file: " + options["char-stream"]);
+        console.log('==============================================================')
+
+        let writeStream;
+        if(typeof options["save"] === "string"){
+            writeStream = fs.createWriteStream(options["save"], {
+                flags: "w",
+                encoding: "utf8",
+                mode: 0o666,
+                autoClose: true,
+                emitClose: true,
+                start: 0
+            });
+            writeStream.on("open", () => {
+                console.log("Stream opened");
+            });
+            writeStream.on("ready", () => {
+                console.log("Stream ready");
+            });
+            writeStream.on("pipe", src => {
+                console.log(src);
+            });
+            writeStream.on("unpipe", src => {
+                console.log(src);
+            });
+            writeStream.on('finish', () => {
+                console.error('All writes are now complete.');
+            });  
+        }
+
+        let index = 0;
+        fs.createReadStream(options["char-stream"])
+            .pipe(split2())
+            .on('data', function(jsonObject) {
+                index++;
+                console.log('row: ' + index);
+                console.log(jsonObject);
+
+                
+                // const valid = validate(jsonObject);
+
+                // if (!valid){
+                //     // const errors = await this.parseErrors(validate.errors);
+                //     // throw errors;
+
+                //     if(options["save"]){
+                //         writeStream.write('Row Index: ' + index + '\n');
+                //         writeStream.write(ajv.errorsText(validate.errors, {
+                //             separator: '\n'
+                //         }));
+                //         writeStream.write('\n\n');
+                //     } else {
+                //         console.log('Record Index: ' + index);
+                //         console.log(ajv.errorsText(validate.errors, {
+                //             separator: '\n'
+                //         }))                        
+                //         console.log('');    
+                //     }
+                // }
+            })
+            .on('finish', function(){
+                console.error('All writes are now complete.');
+                // writeStream.finish();
+            })
+
+
+
+    }
+}
+
+
+
+if(options["walk"]){
+    if(typeof options["walk"] === "string"){
+
+        console.log("walking file: " + options["walk"]);
+        console.log('===================================================================================================')
+        console.log('===================================================================================================')
+
+        let writeStream;
+        if(typeof options["save"] === "string"){
+            writeStream = fs.createWriteStream(options["save"], {
+                flags: "w",
+                encoding: "utf8",
+                mode: 0o666,
+                autoClose: true,
+                emitClose: true,
+                start: 0
+            });
+            writeStream.on("open", () => {
+                console.log("Stream opened");
+            });
+            writeStream.on("ready", () => {
+                console.log("Stream ready");
+            });
+            writeStream.on("pipe", src => {
+                console.log(src);
+            });
+            writeStream.on("unpipe", src => {
+                console.log(src);
+            });
+            writeStream.on('finish', () => {
+                console.error('All writes are now complete.');
+            });  
+        }
+
+        const emitter = bfj.walk(fs.createReadStream(options["walk"]));
+         
+        let rootObject;
+        let stack = [];
+        let lastProperty = "";
+        let lastObject = null;
+        let lastPropertyPath = "";
+        let lastPropertyBase = "";        
+        
+
+        emitter.on(bfj.events.array, function(array){
+            console.log('bfj.events.array      : ', array);
+
+            // rootObject[lastProperty] = [];
+            // lastPropertyBase = lastProperty;
+
+
+            lastPropertyBase = lastProperty;
+
+            if(lastPropertyBase.length === 0){
+                
+                set(rootObject, lastProperty, [])
+            } else {
+                set(rootObject, lastPropertyBase, [])                
+            }
+
+            console.log('lastProperty          : ', lastProperty);
+            console.log('lastPropertyBase      : ', lastPropertyBase);
+            console.log('rootObject            : ', JSON.stringify(rootObject));
+        });
+        emitter.on(bfj.events.object, function(object){
+            console.log('bfj.events.object     : ', object);
+
+            console.log('lastProperty          : ', lastProperty);
+            console.log('lastPropertyBase      : ', lastPropertyBase);
+
+            if(typeof rootObject === "object"){
+                console.log('setting property base : ' + lastPropertyBase);
+                
+                let existingObject = get(rootObject, lastPropertyBase, [])
+                console.log('existingObject        : ', existingObject);
+
+                let assigningPath = "";
+                
+                if(lastPropertyBase.length > 0){
+                    assigningPath = lastPropertyBase + "[" + existingObject.length + "]"
+                } else {
+                    assigningPath = lastProperty + "[" + existingObject.length + "]"
+                }
+
+                console.log('assigningPath         : ', assigningPath);
+                
+                set(rootObject, assigningPath, {});
+
+            } else if(typeof rootObject === "undefined"){
+                rootObject = {};
+            }
+            console.log('rootObject            : ', JSON.stringify(rootObject));
+        });
+        emitter.on(bfj.events.property, function(name){ 
+            console.log('bfj.events.property   : ', name)
+
+            lastProperty = name;
+
+            // lastPropertyPath = lastProperty
+
+            // if(lastPropertyBase.length > 0){
+            //     lastPropertyPath = lastPropertyBase + "." +  lastProperty
+            // } else {
+            //     lastPropertyPath = lastProperty
+            // }
+        });
+        emitter.on(bfj.events.string, function(value){ 
+            console.log('bfj.events.string     : ', value)
+            console.log('lastPropertyBase      : ', lastPropertyBase);
+
+            if(lastPropertyBase.length === 0){
+                set(rootObject, lastProperty, value)
+            } else {
+                let existingObject = get(rootObject, lastPropertyBase, [])
+                console.log('existingObject', existingObject)
+
+                let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
+                console.log('newPath', newPath);
+
+                set(rootObject, newPath, value);
+            }
+            // console.log('rootObject', JSON.stringify(rootObject));
+        });
+        emitter.on(bfj.events.number, function(value){ 
+            console.log('bfj.events.number     : ', value)
+
+            // stack[stack.length - 1][lastProperty] = value
+            // rootObject[lastProperty] = value;
+            // set(rootObject, lastPropertyBase + '.' + lastProperty, value)
+
+            if(lastPropertyBase.length === 0){
+                set(rootObject, lastProperty, value)
+            } else {
+                let existingObject = get(rootObject, lastPropertyBase, [])
+                console.log('existingObject', existingObject)
+
+                let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
+                console.log('newPath', newPath);
+
+                set(rootObject, newPath, value);
+            }
+        });
+        emitter.on(bfj.events.literal, function(value){ 
+            console.log('bfj.events.literal    : ', value)
+
+            // stack[stack.length - 1][lastProperty] = value
+            // rootObject[lastProperty] = value;
+            // set(rootObject, lastPropertyBase + '.' + lastProperty, value)
+
+            if(lastPropertyBase.length === 0){
+                set(rootObject, lastProperty, value)
+            } else {
+                let existingObject = get(rootObject, lastPropertyBase, [])
+                console.log('existingObject', existingObject)
+
+                let newPath = lastPropertyBase + "[" + (existingObject.length - 1)  + "]." + lastProperty;
+                console.log('newPath', newPath);
+
+                set(rootObject, newPath, value);
+            }
+        });
+        emitter.on(bfj.events.endArray, function(array){
+            console.log('bfj.events.endArray   : ', array);
+
+            console.log('lastPropertyBase', lastPropertyBase);
+            let pathComponents = lastPropertyBase.split(".");
+            console.log('pathComponents', pathComponents);
+
+            let lastItem = takeRight(pathComponents, 1);
+            console.log('lastItem', lastItem);
+
+            let remainingPath = join(dropRight(pathComponents, 1), ".");
+            console.log('remainingPath', remainingPath);
+
+            lastPropertyBase = remainingPath;
+        });
+        emitter.on(bfj.events.endObject, function(object){
+            console.log('bfj.events.endObject  : ', JSON.stringify(rootObject))
+            // console.log('lastPropertyBase', lastPropertyBase)
+        });
+        emitter.on(bfj.events.error, function(error){ 
+            console.log('bfj.events.error      : ', error)
+        });
+        emitter.on(bfj.events.dataError, function(error){ 
+            console.log('bfj.events.dataError  : ', error)
+        });
+        emitter.on(bfj.events.end, function(end){
+            console.log('bfj.events.end        : ', end)
+        });
+
+        
     }
 }
 
@@ -350,6 +632,40 @@ if(options["pack"]){
 
             if(options["save"] && packed){
                 fs.writeFile(options["save"], Buffer.from(packed), err => {
+                    if (err) {
+                        console.error(err)
+                        return
+                    }
+                })    
+            }
+        })    
+    }
+}
+
+if(options["stringify"]){
+    if(typeof options["stringify"] === "string"){
+
+        fs.readFile(options["stringify"], 'utf8' , (err, data) => {
+            if (err) {
+              console.error(err)
+              return
+            }
+            console.log('Stringifying file....')
+
+            let parsedData;
+            if(typeof data === "string"){
+                parsedData = JSON.parse(data);
+            } else if(typeof data === "object"){
+                parsedData = data;
+            }
+            
+            let stringified = JSON.stringify(parsedData)
+
+            console.log('typeof stringified', typeof stringified)
+            console.log('stringified', stringified)
+
+            if(options["save"] && stringified){
+                fs.writeFile(options["save"], Buffer.from(stringified), err => {
                     if (err) {
                         console.error(err)
                         return
@@ -424,3 +740,4 @@ if(options["minify"]){
         })    
     }
 }
+
