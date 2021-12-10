@@ -19,14 +19,11 @@ npm install -g .
 #### Usage
 
 ```bash
-# most recent instructions
-validator-tool --help
-
 # read a file
-validator-tool --validate ../data-files/allowed-amounts.json
+validator-tool readfile ../data-files/allowed-amounts.json
 
 # validate a broken file
-validator-tool --validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
+validator-tool validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
 
 # generate an ndjson file  
 validator-tool --generate ../output/allowed-amounts.ndjson --lines 100
