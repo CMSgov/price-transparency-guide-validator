@@ -6,7 +6,9 @@
 
 let fs = require("fs");
 let boxen = require("boxen");
-let yargs = require("yargs/yargs")(process.argv.slice(2));
+let yargs = require("yargs/yargs");
+const { hideBin } = require('yargs/helpers')
+
 let axios = require("axios");
 
 let Ajv = require("ajv")
@@ -40,38 +42,50 @@ var fhir = new Fhir();
 // import yargs from "yargs";
 // import axios frofm "axios";
 
-let options = yargs
+let options = yargs(hideBin(process.argv))
  .usage("Usage: validator-tool <cmd> [args]")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
- .command("readfile",   "Read file", function (yargs, helpOrVersionSet) {
+ .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
     return yargs.option('save', {
       alias: 's'
     })
   })
- .command("validate",   "Validate JSON file")
+ .command("validate",       "Validate JSON file.")
+ .command("generate",       "Generate sample NDJSON file.")
+ .command("stream",         "Stream file and validate each line (NDJSON).")
+ .command("compress",       "Compress the JSON record.")
+ .command("pack",           "Pack the JSON record.")
+ .command("minify",         "Minify the JSON record with a mapping file.")
+ .command("walk",           "Walk a large JSON record via streaming.")
+ .command("walk-and-match", "Walk a large JSON record and validate.")
+ .command("extract",        "Extract matching schemas from a large JSON file.")
 
-//  .option("fetch",      { describe: "Fetch a URL" })
-//  .option("validate",   { describe: "Validate JSON file" })
- .option("generate",   { describe: "Generate sample NDJSON file." })
- .option("stream",     { describe: "Stream file and validate each line (NDJSON)" })
- .option("char-stream",{ describe: "Compress the JSON record into a character stream." })
- .option("compress",   { describe: "Compress the JSON record." })
 //  .option("decompress", { describe: "Decompress the JSON record." })
- .option("pack",       { describe: "Pack the JSON record." })
 //  .option("unpack",     { describe: "Unpack the JSON record." })
- .option("minify",     { describe: "Minify the JSON record with a specific mapping file." })
 //  .option("unminify",   { describe: "Unminify the JSON record." })
- .option("stringify",     { describe: "Stringify a JSON record." })
+ 
+ .option("schema",         { describe: "Path to a schema file" })
+ .option("save",           { describe: "Location to save the output to", alias: 's' })
+ .option("verbose",        { describe: "Verbose mode", alias: 'v' })
+ .option("debug",          { describe: "Include debugging info", alias: 'd' })
+ .option("trace",          { describe: "Include trace info", alias: 't' })
+ .option("memory",         { describe: "Amount of memory (RAM) to use.", alias: 'm' })
 
- .option("walk",           { describe: "Walk a large JSON record via a streaming channel." })
- .option("walk-and-match", { describe: "Walk a large JSON record and match against a schema." })
- 
- .option("verbose",        { describe: "Verbose mode" })
- .option("debug",          { describe: "Include debugging info" })
- .option("trace",          { describe: "Include trace info" })
- 
+ .example([
+    ['$0 readfile ../data-files/allowed-amounts.json'],
+    ['$0 validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json'],
+    ['$0 generate ../output/allowed-amounts.ndjson --lines 100'],
+    ['$0 walk ../data/in-network-rates-fee-for-service-sample.json'],
+    ['$0 walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json'],
+    ['$0 walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson']
+  ])
+
+ .wrap(yargs.terminalWidth)
+ .demandCommand()
+ .recommendCommands()
  .argv;
 
+let command = options._[0];
 
 if(options["echo"]){
     const greeting = `${options["echo"]}!`;
@@ -100,9 +114,13 @@ if(options["fetch"]){
 //     console.log(FhirFoundryUtilities.ping(options.ping))
 // }
 
-if(options["readfile"]){
-    if(typeof options["readfile"] === "string"){
-        fs.readFile(options["readfile"], 'utf8' , (err, data) => {
+if(options["introspect"]){
+    console.log(JSON.stringify(options));
+}
+
+if(command === "readfile"){
+    if(typeof options["file"] === "string"){
+        fs.readFile(options["file"], 'utf8' , (err, data) => {
             if (err) {
               console.error(err)
               return
@@ -113,7 +131,7 @@ if(options["readfile"]){
     }
 }
 
-if(options["validate"]){
+if(command === "validate"){
     if(typeof options["validate"] === "string"){
 
         fs.readFile(options["validate"], 'utf8' , (err, data) => {
@@ -998,30 +1016,31 @@ if(options["walk-and-match"]){
     if(typeof options["walk-and-match"] === "string"){
 
         console.log("walking file: " + options["walk"]);
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-
-        console.log('===================================================================================================')
-        console.log('===================================================================================================')
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        console.log("")
-        
+        if(options["debug"]){
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+    
+            console.log('===================================================================================================')
+            console.log('===================================================================================================')
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+        }
 
         let writeStream;
         if(typeof options["save"] === "string"){
@@ -1086,3 +1105,5 @@ if(options["walk-and-match"]){
         
     }
 }
+
+
