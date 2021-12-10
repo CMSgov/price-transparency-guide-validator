@@ -564,7 +564,7 @@ if(options["minify"]){
 //===========================================================================
 // WALK METHODS
 
-function walkBigFile(bigFilePath, validator, isVerbose){
+function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
     const emitter = bfj.walk(fs.createReadStream(bigFilePath));
          
         let rootObject;
@@ -834,10 +834,14 @@ function walkBigFile(bigFilePath, validator, isVerbose){
                 const valid = validator(existingObject);
 
                 if (valid){
-                    console.log("")
-                    console.log("FOUND A MATCH!!!")
-                    console.log(JSON.stringify(existingObject));
-                    console.log('')
+                    if(options["save"]){
+                        writeStream.write(JSON.stringify(existingObject) + '\n');
+                    } else {
+                        console.log("")
+                        console.log("FOUND A MATCH!!!")
+                        console.log(JSON.stringify(existingObject));
+                        console.log('')
+                    }
                 } 
             } else if(isVerbose){
                 // console.log('Found an object:  ')
@@ -980,7 +984,7 @@ if(options["walk"]){
         }
 
         
-        walkBigFile(options["walk"], null, options["verbose"]) 
+        walkBigFile(options["walk"], null, options["verbose"], null) 
     }
 }
 
@@ -1067,7 +1071,7 @@ if(options["walk-and-match"]){
 
                 const validator = ajv.compile(JSON.parse(schemaData));
 
-                walkBigFile(options["walk-and-match"], validator, options["verbose"])
+                walkBigFile(options["walk-and-match"], validator, options["verbose"], writeStream)
                 
                 console.log('==============================================================')
             });
