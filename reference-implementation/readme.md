@@ -20,31 +20,31 @@ npm install -g .
 
 ```bash
 # most recent instructions
-price-validator --help
+validator-tool --help
 
 # read a file
-price-validator --validate ../data-files/allowed-amounts.json
+validator-tool --validate ../data-files/allowed-amounts.json
 
 # validate a broken file
-price-validator --validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
+validator-tool --validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
 
 # generate an ndjson file  
-price-validator --generate ../output/allowed-amounts.ndjson --lines 100
+validator-tool --generate ../output/allowed-amounts.ndjson --lines 100
 
 # stream an ndjson file and validate along the way
-price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json 
+validator-tool --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json 
 
 # stream an ndjson file, validate, and output the results into a separate file
-price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json --save ../output/errors.txt  
+validator-tool --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json --save ../output/errors.txt  
 
 # walk a big JSON file via streaming
-price-validator --walk ../data/in-network-rates-fee-for-service-sample.json
+validator-tool --walk ../data/in-network-rates-fee-for-service-sample.json
 
 # walk a big JSON file and match schemas as they are read
-price-validator --walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json
+validator-tool --walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json
 
 # walk a big JSON file, match schemas, and write to an output file in NDJSON format as they are read
-price-validator --walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson
+validator-tool --walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson
 ```
 
 #### References  

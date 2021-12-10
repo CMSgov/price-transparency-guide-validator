@@ -1,5 +1,5 @@
 {
-    "name": "price-validator",
+    "name": "validator-tool",
     "version": "0.3.0",
     "description": "",
     "main": "bin/index.js",
@@ -10,7 +10,7 @@
     "author": "Abigail Watson <awatson@mitre.org>",
     "license": "MIT",
     "bin": {
-        "price-validator": "./bin/index.js"
+        "validator-tool": "./bin/index.js"
     },
     "dependencies": {
         "ajv": "8.8.2",

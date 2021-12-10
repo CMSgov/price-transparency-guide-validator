@@ -6,7 +6,7 @@
 
 let fs = require("fs");
 let boxen = require("boxen");
-let yargs = require("yargs");
+let yargs = require("yargs/yargs")(process.argv.slice(2));
 let axios = require("axios");
 
 let Ajv = require("ajv")
@@ -40,13 +40,18 @@ var fhir = new Fhir();
 // import yargs from "yargs";
 // import axios frofm "axios";
 
-const options = yargs
- .usage("Usage: -n <name>")
+let options = yargs
+ .usage("Usage: validator-tool <cmd> [args]")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
- .option("echo",       { describe: "Echo", type: "string" })
- .option("fetch",      { describe: "Fetch a URL" })
- .option("readfile",   { describe: "Read file" })
- .option("validate",   { describe: "Validate JSON file" })
+ .command("readfile",   "Read file", function (yargs, helpOrVersionSet) {
+    return yargs.option('save', {
+      alias: 's'
+    })
+  })
+ .command("validate",   "Validate JSON file")
+
+//  .option("fetch",      { describe: "Fetch a URL" })
+//  .option("validate",   { describe: "Validate JSON file" })
  .option("generate",   { describe: "Generate sample NDJSON file." })
  .option("stream",     { describe: "Stream file and validate each line (NDJSON)" })
  .option("char-stream",{ describe: "Compress the JSON record into a character stream." })
@@ -59,11 +64,12 @@ const options = yargs
  .option("stringify",     { describe: "Stringify a JSON record." })
 
  .option("walk",           { describe: "Walk a large JSON record via a streaming channel." })
- .option("walk-and-match", { describe: "Walk a large JSON record via a streaming channel and match against a selected schema." })
+ .option("walk-and-match", { describe: "Walk a large JSON record and match against a schema." })
  
  .option("verbose",        { describe: "Verbose mode" })
  .option("debug",          { describe: "Include debugging info" })
  .option("trace",          { describe: "Include trace info" })
+ 
  .argv;
 
 
