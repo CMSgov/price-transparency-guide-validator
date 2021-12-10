@@ -55,7 +55,7 @@ let options = yargs(hideBin(process.argv))
  .command("stream",         "Stream file and validate each line (NDJSON).")
  .command("compress",       "Compress the JSON record.")
  .command("pack",           "Pack the JSON record.")
- .command("minify",         "Minify the JSON record with a mapping file.")
+//  .command("minify",         "Minify the JSON record with a mapping file.")
  .command("walk",           "Walk a large JSON record via streaming.")
  .command("walk-and-match", "Walk a large JSON record and validate.")
  .command("extract",        "Extract matching schemas from a large JSON file.")
@@ -524,69 +524,73 @@ if(command === "stringify"){
     }
 }
 
-var specs = {
-    'reporting_entity_name': 'a',
-    'reporting_entity_type': 'b',
-    'reporting_plans': 'c',
-    'last_updated_on': 'd',
-    'version': 'e',
-    'out_of_network': 'f',
-    'plan_name': 'g',
-    'plan_id_type': 'h',
-    'plan_id': 'i',
-    'plan_market_type': 'j',
-    'name': 'k',
-    'billing_code_type': 'l',
-    'billing_code_type_version': 'm',
-    'billing_code': 'n',
-    'description': 'o',
-    'allowed_amounts': 'p',
-    "tin": 'q',
-    'type': 'r',
-    'value': 's',
-    'service_code': 't',
-    'billing_class': 'u',
-    'payments': 'v',
-    'providers': 'w',
-    'billed_charge': 'x',
-    'npi': 'y'
-  };
-var minifier = require('json-minifier')(specs);
+// var specs = {
+//     'reporting_entity_name': 'a',
+//     'reporting_entity_type': 'b',
+//     'reporting_plans': 'c',
+//     'last_updated_on': 'd',
+//     'version': 'e',
+//     'out_of_network': 'f',
+//     'plan_name': 'g',
+//     'plan_id_type': 'h',
+//     'plan_id': 'i',
+//     'plan_market_type': 'j',
+//     'name': 'k',
+//     'billing_code_type': 'l',
+//     'billing_code_type_version': 'm',
+//     'billing_code': 'n',
+//     'description': 'o',
+//     'allowed_amounts': 'p',
+//     "tin": 'q',
+//     'type': 'r',
+//     'value': 's',
+//     'service_code': 't',
+//     'billing_class': 'u',
+//     'payments': 'v',
+//     'providers': 'w',
+//     'billed_charge': 'x',
+//     'npi': 'y'
+//   };
 
+// security vulnerability with older version of json-minify
+// relies on lodash; need to upgrade to lodash@4.17.21
+// https://github.com/advisories/GHSA-35jh-r3h4-6jhm
 
-if(command === "minify"){
-    if(typeof options["minify"] === "string"){
+// var minifier = require('json-minifier')(specs);
 
-        fs.readFile(options["minify"], 'utf8' , (err, data) => {
-            if (err) {
-              console.error(err)
-              return
-            }
-            console.log('Minifying file....')
+// if(command === "minify"){
+//     if(typeof options["minify"] === "string"){
 
-            let parsedData;
-            if(typeof data === "string"){
-                parsedData = JSON.parse(data);
-            } else if(typeof data === "object"){
-                parsedData = data;
-            }
+//         fs.readFile(options["minify"], 'utf8' , (err, data) => {
+//             if (err) {
+//               console.error(err)
+//               return
+//             }
+//             console.log('Minifying file....')
+
+//             let parsedData;
+//             if(typeof data === "string"){
+//                 parsedData = JSON.parse(data);
+//             } else if(typeof data === "object"){
+//                 parsedData = data;
+//             }
             
-            let minified = minifier.minify(parsedData)
+//             let minified = minifier.minify(parsedData)
 
-            console.log('typeof minified', typeof minified)
-            console.log('minified', minified)
+//             console.log('typeof minified', typeof minified)
+//             console.log('minified', minified)
 
-            if(options["save"] && minified){
-                fs.writeFile(options["save"], Buffer.from(minified), err => {
-                    if (err) {
-                        console.error(err)
-                        return
-                    }
-                })    
-            }
-        })    
-    }
-}
+//             if(options["save"] && minified){
+//                 fs.writeFile(options["save"], Buffer.from(minified), err => {
+//                     if (err) {
+//                         console.error(err)
+//                         return
+//                     }
+//                 })    
+//             }
+//         })    
+//     }
+// }
 
 
 //===========================================================================
