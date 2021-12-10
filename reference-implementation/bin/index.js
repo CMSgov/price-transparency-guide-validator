@@ -6,8 +6,8 @@
 
 let fs = require("fs");
 let boxen = require("boxen");
-let yargs = require("yargs/yargs");
-const { hideBin } = require('yargs/helpers')
+let yargs = require("yargs");
+// const { hideBin } = require('yargs/helpers')
 
 let axios = require("axios");
 
@@ -42,7 +42,7 @@ var fhir = new Fhir();
 // import yargs from "yargs";
 // import axios frofm "axios";
 
-let options = yargs(hideBin(process.argv))
+let options = yargs()
  .usage("Usage: validator-tool <cmd> [args]")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
  .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
@@ -84,7 +84,7 @@ let options = yargs(hideBin(process.argv))
     ['$0 extract --file ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson --fhir --resource-type "PricingTier"']
   ])
 
- .wrap(yargs.terminalWidth)
+ .wrap(yargs.terminalWidth())
  .demandCommand()
  .recommendCommands()
  .argv;
