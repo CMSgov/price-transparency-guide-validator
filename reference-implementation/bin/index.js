@@ -64,20 +64,24 @@ let options = yargs(hideBin(process.argv))
 //  .option("unpack",     { describe: "Unpack the JSON record." })
 //  .option("unminify",   { describe: "Unminify the JSON record." })
  
- .option("schema",         { describe: "Path to a schema file" })
+ .option("file",           { describe: "Path to file." })
+ .option("schema",         { describe: "Path to a schema file (in JsonSchema format)" })
  .option("save",           { describe: "Location to save the output to", alias: 's' })
  .option("verbose",        { describe: "Verbose mode", alias: 'v' })
  .option("debug",          { describe: "Include debugging info", alias: 'd' })
  .option("trace",          { describe: "Include trace info", alias: 't' })
- .option("memory",         { describe: "Amount of memory (RAM) to use.", alias: 'm' })
+ .option("memory",         { describe: "Amount of memory (RAM) to use.  Default chunk size: 10000000 (10MB)", alias: 'm', default: 10000000 })
+ .option("fhir",           { describe: "Specify to output in FHIR format.",  })
+ .option("resource-type",  { describe: "Define a default FHIR resource type for extraction.",  })
 
  .example([
     ['$0 readfile ../data-files/allowed-amounts.json'],
     ['$0 validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json'],
     ['$0 generate ../output/allowed-amounts.ndjson --lines 100'],
-    ['$0 walk ../data/in-network-rates-fee-for-service-sample.json'],
+    ['$0 walk --file ../data/in-network-rates-fee-for-service-sample.json'],
     ['$0 walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json'],
-    ['$0 walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson']
+    ['$0 extract --file ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson'],
+    ['$0 extract --file ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson --fhir --resource-type "PricingTier"']
   ])
 
  .wrap(yargs.terminalWidth)
@@ -132,9 +136,9 @@ if(command === "readfile"){
 }
 
 if(command === "validate"){
-    if(typeof options["validate"] === "string"){
+    if(typeof options["file"] === "string"){
 
-        fs.readFile(options["validate"], 'utf8' , (err, data) => {
+        fs.readFile(options["file"], 'utf8' , (err, data) => {
             if (err) {
               console.error(err)
               return
@@ -204,7 +208,7 @@ if(command === "validate"){
 }
 
 
-if(options["generate"]){                
+if(command === "generate"){                
     let schemaTemplate = {
         "reporting_entity_name": "medicare",
         "reporting_entity_type": "medicare",
@@ -251,7 +255,7 @@ if(options["generate"]){
 } 
 
 
-if(options["stream"]){
+if(command === "stream"){
     if(typeof options["stream"] === "string"){
 
         console.log("Streaming file: " + options["stream"]);
@@ -303,7 +307,7 @@ if(options["stream"]){
                 }
 
                 let index = 0;
-                fs.createReadStream(options["stream"])
+                fs.createReadStream(options["stream"], { highWaterMark: options["memory"]})
                     .pipe(ndjson.parse())
                     .on('data', function(jsonObject) {
                         index++;
@@ -345,7 +349,7 @@ if(options["stream"]){
     }
 }
 
-if(options["char-stream"]){
+if(command === "char-stream"){
     if(typeof options["char-stream"] === "string"){
 
         console.log("Streaming file: " + options["char-stream"]);
@@ -418,7 +422,7 @@ if(options["char-stream"]){
     }
 }
 
-if(options["compress"]){
+if(command === "compress"){
     if(typeof options["compress"] === "string"){
 
         fs.readFile(options["compress"], 'utf8' , (err, data) => {
@@ -452,7 +456,7 @@ if(options["compress"]){
     }
 }
 
-if(options["pack"]){
+if(command === "pack"){
     if(typeof options["pack"] === "string"){
 
         fs.readFile(options["pack"], 'utf8' , (err, data) => {
@@ -486,7 +490,7 @@ if(options["pack"]){
     }
 }
 
-if(options["stringify"]){
+if(command === "stringify"){
     if(typeof options["stringify"] === "string"){
 
         fs.readFile(options["stringify"], 'utf8' , (err, data) => {
@@ -550,7 +554,7 @@ var specs = {
 var minifier = require('json-minifier')(specs);
 
 
-if(options["minify"]){
+if(command === "minify"){
     if(typeof options["minify"] === "string"){
 
         fs.readFile(options["minify"], 'utf8' , (err, data) => {
@@ -589,7 +593,7 @@ if(options["minify"]){
 // WALK METHODS
 
 function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
-    const emitter = bfj.walk(fs.createReadStream(bigFilePath));
+    const emitter = bfj.walk(fs.createReadStream(bigFilePath, { highWaterMark: options["memory"] }));
          
         let rootObject;
         let stack = [];
@@ -859,7 +863,18 @@ function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
 
                 if (valid){
                     if(options["save"]){
-                        writeStream.write(JSON.stringify(existingObject) + '\n');
+                        let objectToSave = {};
+                        if(options["fhir"]){
+                            if(options["resource-type"]){
+                                
+                                objectToSave.resourceType = options["resource-type"]
+                                Object.assign(objectToSave, existingObject);
+                            } else {
+                                objectToSave.resourceType = "Basic"
+                                Object.assign(objectToSave, existingObject);
+                            }
+                        }
+                        writeStream.write(JSON.stringify(objectToSave) + '\n');
                     } else {
                         console.log("")
                         console.log("FOUND A MATCH!!!")
@@ -950,8 +965,8 @@ function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
         });
 }
 
-if(options["walk"]){
-    if(typeof options["walk"] === "string"){
+if(command === "walk"){
+    if(typeof options["file"] === "string"){
 
         console.log("walking file: " + options["walk"]);
         if(options["verbose"]){
@@ -1012,10 +1027,83 @@ if(options["walk"]){
     }
 }
 
-if(options["walk-and-match"]){
-    if(typeof options["walk-and-match"] === "string"){
+if(command === "walk-and-match"){
+    if(typeof options["file"] === "string"){
 
-        console.log("walking file: " + options["walk"]);
+        console.log("walking file: " + options["file"]);
+        if(options["debug"]){
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+    
+            console.log('===================================================================================================')
+            console.log('===================================================================================================')
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+            console.log("")
+        }
+
+        let writeStream;
+        if(typeof options["save"] === "string"){
+            writeStream = fs.createWriteStream(options["save"], {
+                flags: "w",
+                encoding: "utf8",
+                mode: 0o666,
+                autoClose: true,
+                emitClose: true,
+                start: 0
+            });
+            writeStream.on("open", () => {
+                console.log("Stream opened");
+            });
+            writeStream.on("ready", () => {
+                console.log("Stream ready");
+            });
+            writeStream.on("pipe", src => {
+                console.log(src);
+            });
+            writeStream.on("unpipe", src => {
+                console.log(src);
+            });
+            writeStream.on('finish', () => {
+                console.error('All writes are now complete.');
+            });  
+        }
+
+        if(typeof options["schema"] === "string"){
+            fs.readFile(options["schema"], 'utf8' , (err, schemaData) => {
+                if (err) {
+                  console.error(err)
+                  return
+                }
+                if(schemaData){
+                    selectedSchema = schemaData;
+                }
+            });
+        }
+
+        
+    }
+}
+
+if(command === "extract"){
+    if(typeof options["file"] === "string"){
+
+        console.log("walking file: " + options["file"]);
         if(options["debug"]){
             console.log("")
             console.log("")
@@ -1086,23 +1174,16 @@ if(options["walk-and-match"]){
                     console.log(schemaData)
                     console.log('')
                     console.log('--------------------------------------------------------------')
-                    console.log('')
-                    console.log('JSON file.......')
-                    console.log(jsonObject)
-                    console.log('')
-                    console.log('--------------------------------------------------------------')
-                    console.log('')    
                 }
 
                 const validator = ajv.compile(JSON.parse(schemaData));
 
-                walkBigFile(options["walk-and-match"], validator, options["verbose"], writeStream)
+                walkBigFile(options["file"], validator, options["verbose"], writeStream)
                 
                 console.log('==============================================================')
             });
         }
 
-        
     }
 }
 

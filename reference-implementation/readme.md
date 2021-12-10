@@ -26,7 +26,7 @@ validator-tool readfile ../data-files/allowed-amounts.json
 validator-tool validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json
 
 # generate an ndjson file  
-validator-tool --generate ../output/allowed-amounts.ndjson --lines 100
+validator-tool generate ../output/allowed-amounts.ndjson --lines 100
 
 # stream an ndjson file and validate along the way
 validator-tool --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json 
@@ -50,3 +50,4 @@ https://developer.okta.com/blog/2019/06/18/command-line-app-with-nodejs
 https://medium.com/nsoft/using-ajv-for-schema-validation-with-nodejs-1dfef0a372f8  
 https://nodejs.org/en/knowledge/advanced/streams/how-to-use-fs-create-read-stream/  
 https://nodejs.org/en/knowledge/advanced/streams/how-to-use-fs-create-write-stream/  
+https://betterprogramming.pub/a-memory-friendly-way-of-reading-files-in-node-js-a45ad0cc7bb6  
