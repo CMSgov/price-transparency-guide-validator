@@ -36,6 +36,15 @@ price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/al
 
 # stream an ndjson file, validate, and output the results into a separate file
 price-validator --stream ../output/allowed-amounts.ndjson --schema ../schemas/allowed-amounts.json --save ../output/errors.txt  
+
+# walk a big JSON file via streaming
+price-validator --walk ../data/in-network-rates-fee-for-service-sample.json
+
+# walk a big JSON file and match schemas as they are read
+price-validator --walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json
+
+# walk a big JSON file, match schemas, and write to an output file in NDJSON format as they are read
+price-validator --walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson
 ```
 
 #### References  
