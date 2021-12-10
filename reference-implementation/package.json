@@ -1,6 +1,6 @@
 {
-    "name": "price-validator",
-    "version": "1.0.0",
+    "name": "validator-tool",
+    "version": "0.3.0",
     "description": "",
     "main": "bin/index.js",
     "scripts": {
@@ -10,24 +10,26 @@
     "author": "Abigail Watson <awatson@mitre.org>",
     "license": "MIT",
     "bin": {
-        "price-validator": "./bin/index.js"
+        "validator-tool": "./bin/index.js"
     },
     "dependencies": {
         "ajv": "8.8.2",
         "axios": "^0.21.1",
+        "bfj": "7.0.2",
         "bluebird": "^3.7.2",
-        "boxen": "4.0",
+        "boxen": "^4.2.0",
         "chalk": "2.4",
         "chance": "1.1.8",
         "compress-json": "2.0.1",
         "fhir": "^4.10.0",
         "jsonpack": "1.1.5",
-        "json-minifier": "0.0.3",
         "line-reader": "^0.4.0",
+        "lodash": "4.17.21",
         "ndjson": "2.0.0",
         "random": "3.0.6",
         "readline": "^1.3.0",
-        "yargs": "13.2"
+        "split2": "4.1.0",
+        "yargs": "17.3"
     },
     "devDependencies": {
         "@babel/cli": "^7.15.4",
