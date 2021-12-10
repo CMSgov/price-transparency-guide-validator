@@ -14,7 +14,7 @@ jobs:
       - name: List files in the repository
         run: cd ${{ github.workspace }}/reference-implementation && ls
       - name: Run command
-        run: cd ${{ github.workspace }}/reference-implementation && npm install . && validator-tool
+        run: cd ${{ github.workspace }}/reference-implementation && npm install -g . && validator-tool
       - name: Run mocha tests
         run: cd ${{ github.workspace }}/reference-implementation && npm test
       - run: echo "🍏 This job's status is ${{ job.status }}."
