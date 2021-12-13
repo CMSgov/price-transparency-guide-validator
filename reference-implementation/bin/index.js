@@ -77,7 +77,7 @@ let options = yargs(hideBin(process.argv))
     ['$0 readfile ../data-files/allowed-amounts.json'],
     ['$0 validate ../data-files/allowed-amounts-borked.json --schema ../schemas/allowed-amounts.json'],
     ['$0 generate ../output/allowed-amounts.ndjson --lines 100'],
-    ['$0 walk --file ../data/in-network-rates-fee-for-service-sample.json'],
+    ['$0 walk --file ../data-files/in-network-rates-fee-for-service-sample.json'],
     ['$0 walk-and-match ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json'],
     ['$0 extract --file ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson'],
     ['$0 extract --file ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson --fhir --resource-type "PricingTier"']
