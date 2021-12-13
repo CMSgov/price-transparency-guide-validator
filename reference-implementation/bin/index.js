@@ -26,7 +26,6 @@ var takeRight = require('lodash/takeRight');
 var join = require('lodash/join');
 var replace = require('lodash/replace');
 
-
 let compress = require('compress-json').compress;
 let decompress = require('compress-json').decompress;
 let jsonpack = require('jsonpack/main')
@@ -45,11 +44,11 @@ var fhir = new Fhir();
 let options = yargs(hideBin(process.argv))
  .usage("Usage: validator-tool <cmd> [args]")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
-//  .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
-//     return yargs.option('save', {
-//       alias: 's'
-//     })
-//   })
+ .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
+    return yargs.option('save', {
+      alias: 's'
+    })
+  })
  .command("validate",       "Validate JSON file.")
  .command("generate",       "Generate sample NDJSON file.")
  .command("stream",         "Stream file and validate each line (NDJSON).")
@@ -59,7 +58,7 @@ let options = yargs(hideBin(process.argv))
  .command("walk-and-match", "Walk a large JSON record and validate.")
  .command("extract",        "Extract matching schemas from a large JSON file.")
 
-//  .command("minify",         "Minify the JSON record with a mapping file.")
+//  .command("minify",  "Minify the JSON record with a mapping file.")
 //  .option("decompress", { describe: "Decompress the JSON record." })
 //  .option("unpack",     { describe: "Unpack the JSON record." })
 //  .option("unminify",   { describe: "Unminify the JSON record." })
