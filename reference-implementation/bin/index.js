@@ -90,6 +90,12 @@ let options = yargs(hideBin(process.argv))
 
 let command = options._[0];
 
+if(options["introspect"]){
+    // console.log(JSON.stringify(options));
+    console.log('options', options)
+    console.log('command', command)
+}
+
 
 if(options["echo"]){
     const greeting = `${options["echo"]}!`;
@@ -114,17 +120,6 @@ if(options["fetch"]){
     });   
 }
 
-// if(options.ping){
-//     console.log(FhirFoundryUtilities.ping(options.ping))
-// }
-
-if(options["introspect"]){
-    // console.log(JSON.stringify(options));
-    console.log('options', options)
-    console.log('command', command)
-
-
-}
 
 if(command === "readfile"){
     if(typeof options["file"] === "string"){
