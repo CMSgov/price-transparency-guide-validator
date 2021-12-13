@@ -6,8 +6,8 @@
 
 let fs = require("fs");
 let boxen = require("boxen");
-let yargs = require("yargs");
-// const { hideBin } = require('yargs/helpers')
+let yargs = require("yargs/yargs");
+const { hideBin } = require('yargs/helpers')
 
 let axios = require("axios");
 
@@ -42,24 +42,24 @@ var fhir = new Fhir();
 // import yargs from "yargs";
 // import axios frofm "axios";
 
-let options = yargs()
+let options = yargs(hideBin(process.argv))
  .usage("Usage: validator-tool <cmd> [args]")
  .config({"url": "http://localhost:3000/baseR4/metadata"})
- .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
-    return yargs.option('save', {
-      alias: 's'
-    })
-  })
+//  .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
+//     return yargs.option('save', {
+//       alias: 's'
+//     })
+//   })
  .command("validate",       "Validate JSON file.")
  .command("generate",       "Generate sample NDJSON file.")
  .command("stream",         "Stream file and validate each line (NDJSON).")
  .command("compress",       "Compress the JSON record.")
  .command("pack",           "Pack the JSON record.")
-//  .command("minify",         "Minify the JSON record with a mapping file.")
  .command("walk",           "Walk a large JSON record via streaming.")
  .command("walk-and-match", "Walk a large JSON record and validate.")
  .command("extract",        "Extract matching schemas from a large JSON file.")
 
+//  .command("minify",         "Minify the JSON record with a mapping file.")
 //  .option("decompress", { describe: "Decompress the JSON record." })
 //  .option("unpack",     { describe: "Unpack the JSON record." })
 //  .option("unminify",   { describe: "Unminify the JSON record." })
@@ -84,12 +84,13 @@ let options = yargs()
     ['$0 extract --file ../data-files/in-network-rates-fee-for-service-sample.json --schema ../schemas/negotiated-rate.json --save ../output/network-rates.ndjson --fhir --resource-type "PricingTier"']
   ])
 
- .wrap(yargs.terminalWidth())
+ .wrap(yargs.terminalWidth)
  .demandCommand()
  .recommendCommands()
  .argv;
 
 let command = options._[0];
+
 
 if(options["echo"]){
     const greeting = `${options["echo"]}!`;
@@ -119,7 +120,11 @@ if(options["fetch"]){
 // }
 
 if(options["introspect"]){
-    console.log(JSON.stringify(options));
+    // console.log(JSON.stringify(options));
+    console.log('options', options)
+    console.log('command', command)
+
+
 }
 
 if(command === "readfile"){
