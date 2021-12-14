@@ -10,7 +10,7 @@
     "author": "Abigail Watson <awatson@mitre.org>",
     "license": "MIT",
     "bin": {
-        "validator-tool": "./bin/index.js"
+        "validator-tool": "node ./bin/index.js --max-old-space-size=8192"
     },
     "dependencies": {
         "ajv": "8.8.2",
@@ -25,6 +25,8 @@
         "jsonpack": "1.1.5",
         "line-reader": "^0.4.0",
         "lodash": "4.17.21",
+        "moment": "2.29.1",
+        "luxon": "2.2.0",
         "ndjson": "2.0.0",
         "random": "3.0.6",
         "readline": "^1.3.0",
