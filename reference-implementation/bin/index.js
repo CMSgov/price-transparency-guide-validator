@@ -25,6 +25,8 @@ var dropRight = require('lodash/dropRight');
 var takeRight = require('lodash/takeRight');
 var join = require('lodash/join');
 var replace = require('lodash/replace');
+var trimEnd = require('lodash/trimEnd');
+var upperFirst = require('lodash/upperFirst');
 
 let compress = require('compress-json').compress;
 let decompress = require('compress-json').decompress;
@@ -37,13 +39,23 @@ let Promise = require('bluebird');
 var Fhir = require('fhir').Fhir;
 var fhir = new Fhir();
 
+// Load Chance
+var Chance = require('chance');
+
+// Instantiate Chance so it can be used
+var chance = new Chance();
+
+const { DateTime } = require("luxon");
+const { match } = require("assert");
+const { unset } = require("lodash");
+
 // import boxen from "boxen";
 // import yargs from "yargs";
 // import axios frofm "axios";
 
 let options = yargs(hideBin(process.argv))
  .usage("Usage: validator-tool <cmd> [args]")
- .config({"url": "http://localhost:3000/baseR4/metadata"})
+ .config({"url": "http://localhost:3000/baseR4/metadata", "stats": true, "memory": 10000000})
  .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
     return yargs.option('save', {
       alias: 's'
@@ -70,8 +82,11 @@ let options = yargs(hideBin(process.argv))
  .option("debug",          { describe: "Include debugging info", alias: 'd' })
  .option("trace",          { describe: "Include trace info", alias: 't' })
  .option("memory",         { describe: "Amount of memory (RAM) to use.  Default chunk size: 10000000 (10MB)", alias: 'm', default: 10000000 })
- .option("fhir",           { describe: "Specify to output in FHIR format.",  })
- .option("resource-type",  { describe: "Define a default FHIR resource type for extraction.",  })
+ .option("fhir",           { describe: "Specify to output in FHIR format."  })
+ .option("resource-type",  { describe: "Define a default FHIR resource type for extraction."  })
+ .option("tetris",         { describe: "Remove objects from memory after theyve been matched and validated." })
+ .option("dump",           { describe: "Perform a memory dump at the end of the run." })
+
 
  .example([
     ['$0 readfile --file ../data-files/allowed-amounts.json'],
@@ -96,7 +111,6 @@ if(options["introspect"]){
     console.log('command', command)
 }
 
-
 if(options["echo"]){
     const greeting = `${options["echo"]}!`;
 
@@ -107,6 +121,7 @@ if(options["echo"]){
      borderColor: "green",
      backgroundColor: "#555555"
     };
+
     const msgBox = boxen( greeting, boxenOptions );
     
     console.log(msgBox);    
@@ -207,7 +222,15 @@ if(command === "validate"){
 }
 
 
-if(command === "generate"){                
+if(command === "generate"){            
+    
+    console.log('Generating a new sample record.')
+    if(!options["debug"]){
+        console.log("If this utility appears to hang, you may want to consider running it with --debug")
+    }
+    let startTimestamp = DateTime.now();
+    // console.log("Timestamp Start: " + DateTime.now())
+
     let schemaTemplate = {
         "reporting_entity_name": "medicare",
         "reporting_entity_type": "medicare",
@@ -217,9 +240,10 @@ if(command === "generate"){
           "plan_id": "11111111111",
           "plan_market_type": "individual"
         }],
-        "last_updated_on": "2020-08-27",
+        "last_updated_on": startTimestamp.toFormat("yyyy-mm-dd"),
         "version": "1.0.0",
-        "out_of_network":[]
+        "out_of_network":[],
+        "in_network": []
     };
 
     let lineCount = 1;
@@ -229,30 +253,133 @@ if(command === "generate"){
 
     let ndJsonString = "";
 
-    for (let index = 0; index < lineCount; index++) {
-        ndJsonString += JSON.stringify(schemaTemplate) + "\n"    
+    
 
-        if(options["debug"]){
-            if(index % 10 === 0){
-                console.log(index)
+    // fs.writeFile(options["save"], Buffer.from(ndJsonString), err => {
+    //     if (err) {
+    //         console.error(err)
+    //         return
+    //     } else {
+    //         console.log('No errors reported.  Should be finished.')
+    //     }
+    // })
+
+    if(typeof options["save"] === "string"){
+        writeStream = fs.createWriteStream(options["save"], {
+            flags: "w",
+            encoding: "utf8",
+            mode: 0o666,
+            autoClose: true,
+            emitClose: true,
+            start: 0,
+            highWaterMark: options["memory"]
+        });
+        writeStream.on("open", () => {
+            console.log("Stream opened");
+        });
+        writeStream.on("ready", () => {
+            console.log("Stream ready");
+        });
+        writeStream.on("pipe", src => {
+            console.log(src);
+        });
+        writeStream.on("unpipe", src => {
+            console.log(src);
+        });
+        writeStream.on('finish', () => {
+            console.log('All writes are now complete.');
+            
+            let endTimestamp = DateTime.now();
+            var diffInSeconds = endTimestamp.diff(startTimestamp, 'seconds');
+            diffInSeconds.toObject(); //=> { months: 1 }
+            
+            console.log("Duration: " + JSON.stringify(diffInSeconds.toObject()))
+        });  
+
+        writeStream.write(trimEnd(JSON.stringify(schemaTemplate), ']}'));
+        for (let index = 0; index < lineCount; index++) {
+            if(index !== 0){
+                writeStream.write(",");
             }
-        }
-        if(options["trace"]){
-            console.log(ndJsonString)
-        }    
-    }
-    if(options["debug"]){
-        console.log("Finished: " + lineCount);
-    }
 
-    fs.writeFile(options["save"], Buffer.from(ndJsonString), err => {
-        if (err) {
-            console.error(err)
-            return
-        } else {
-            console.log('No errors reported.  Should be finished.')
+            let inNetworkPriceTier = {
+                "negotiation_arrangement": chance.pickone([
+                    "ffs",
+                    "bundle",
+                    "capitation"
+                  ]),
+                "name": upperFirst(chance.word()) + " " + chance.word(),
+                "billing_code_type": "CPT",
+                "billing_code_type_version": "2020",
+                "billing_code": chance.integer({ min: 0, max: 99999 }).toString(),
+                "description": chance.sentence(),
+                "negotiated_rates": []
+            }
+
+            let numRatesInTier = chance.integer({min: 1, max: 5});
+            for (let rateIndex = 0; rateIndex < numRatesInTier; rateIndex++) {
+                let newRate = {
+                    "provider_groups": [],
+                    "negotiated_prices": []
+                }
+
+                let numProviderGroups = chance.integer({min: 1, max: 5});
+                for (let providerIndex = 0; providerIndex < numProviderGroups; providerIndex++) {
+                    let newProviderGroup = {
+                        "npi": [],
+                        "tin":{
+                          "type": chance.pickone(["ein", "npi"]),
+                          "value": chance.natural({min: 0, max: 1000000000}).toString()
+                        }
+                    }
+                    let numNpi = chance.integer({min: 1, max: 5});
+                    for (let npiIndex = 0; npiIndex < numNpi; npiIndex++) {
+                        newProviderGroup.npi.push(chance.natural({min: 0, max: 1000000000}));
+                        
+                    }
+                    newRate.provider_groups.push(newProviderGroup);
+                }
+
+                let numNegotiatedPrices = chance.integer({min: 1, max: 5});
+                for (let priceIndex = 0; priceIndex < numNegotiatedPrices; priceIndex++) {
+                    let newNegotiatedPrice = {
+                        "negotiated_type": chance.pickone([
+                            "negotiated",
+                            "derived",
+                            "fee schedule"
+                          ]),
+                        "negotiated_rate": chance.integer({ min: 0, max: 1000 }),
+                        "expiration_date": DateTime.now().plus({months: 12}).toISODate(),
+                        "service_code": chance.pickset(["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59","60","61","62","63","64","65","66","67","68","69","70","71","72","73","74","75","76","77","78","79","80","81","82","83","84","85","86","87","88","89","90","91","92","93","94","95","96","97","98","99"], 3),
+                        "billing_class": chance.pickone([
+                            "professional",
+                            "institutional"
+                          ])
+                    }
+                    newRate.negotiated_prices.push(newNegotiatedPrice);
+                }
+
+                inNetworkPriceTier.negotiated_rates.push(newRate);                
+            }
+
+            writeStream.write(JSON.stringify(inNetworkPriceTier));
+    
+            if(options["debug"]){
+                if(index % 1000 === 0){
+                    console.log((index / 1000).toFixed(0) + " K")
+                }
+            }
+            if(options["trace"]){
+                console.log(ndJsonString)
+            }    
         }
-    })
+
+        writeStream.write(']}');
+        writeStream.end();
+        if(options["debug"]){
+            console.log("Finished: " + lineCount);
+        }
+    }
 } 
 
 
@@ -288,7 +415,8 @@ if(command === "stream"){
                         mode: 0o666,
                         autoClose: true,
                         emitClose: true,
-                        start: 0
+                        start: 0,
+                        highWaterMark: options["memory"]
                     });
                     writeStream.on("open", () => {
                         console.log("Stream opened");
@@ -364,7 +492,8 @@ if(command === "char-stream"){
                 mode: 0o666,
                 autoClose: true,
                 emitClose: true,
-                start: 0
+                start: 0,
+                highWaterMark: options["memory"]
             });
             writeStream.on("open", () => {
                 console.log("Stream opened");
@@ -384,7 +513,7 @@ if(command === "char-stream"){
         }
 
         let index = 0;
-        fs.createReadStream(options["char-stream"])
+        fs.createReadStream(options["char-stream"], { highWaterMark: options["memory"]})
             .pipe(split2())
             .on('data', function(jsonObject) {
                 index++;
@@ -597,7 +726,7 @@ if(command === "stringify"){
 //===========================================================================
 // WALK METHODS
 
-function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
+function walkBigFile(bigFilePath, validator, isVerbose, writeStream, startTimestamp){
     const emitter = bfj.walk(fs.createReadStream(bigFilePath, { highWaterMark: options["memory"] }));
          
     let rootObject;
@@ -606,6 +735,8 @@ function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
     let lastObject = null;
     let lastPropertyPath = "";
     let lastPropertyBase = "";       
+
+    let matchCount = 0;
 
     emitter.on(bfj.events.array, function(array){
         if(isVerbose) console.log('bfj.events.array      : ', array);
@@ -862,13 +993,18 @@ function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
         let remainingPath = "";
 
         let existingObject = get(rootObject, lastPropertyBase);
+        if(options["peek"]){
+            console.log(JSON.stringify(existingObject));
+        }
 
         if(validator){
             const valid = validator(existingObject);
 
+            let doesNotHaveErrors = true;
             if (valid){
                 if(options["save"]){
                     let objectToSave = {};
+                    matchCount++;
                     if(options["fhir"]){
                         if(options["resource-type"]){
                             
@@ -881,15 +1017,35 @@ function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
                             writeStream.write(JSON.stringify(objectToSave) + '\n');
                         }
                     } else {
-                        writeStream.write(JSON.stringify(existingObject) + '\n');
+                        Object.assign(objectToSave, existingObject);
+                        writeStream.write(JSON.stringify(objectToSave) + '\n');
                     }
-                } else {
+                    if(matchCount % 1000 === 0){
+                        console.log("Matches: " + (matchCount / 1000).toFixed(0) + "K    Heap Total: " + (process.memoryUsage().heapTotal / 1048576).toFixed(0) + " MB   Heap Usage: " + (process.memoryUsage().heapUsed / 1048576).toFixed(0) + " MB    ArrayBuffers: " + process.memoryUsage().arrayBuffers);
+                    }
+            } else {
                     console.log("")
-                    console.log("FOUND A MATCH!!!")
-                    console.log(JSON.stringify(existingObject));
+                    console.log("FOUND A MATCH!!!  #" + matchCount);
+                    matchCount++;
+                    console.log("Location: " + lastPropertyBase)
+                    if(options["verbose"]){
+                        console.log(JSON.stringify(existingObject));
+                    }                    
                     console.log('')
+
+                    if(options["tetris"]){
+                        set(rootObject, lastPropertyBase, null)
+                    }
                 }
-            } 
+            } else {
+                doesNotHaveErrors = false;
+
+                if(options["debug"]){
+                    console.log(ajv.errorsText(validator.errors, {
+                        separator: '\n'
+                    }))                            
+                }
+            }
         } else if(isVerbose){
             // console.log('Found an object:  ')
             if(Array.isArray(existingObject)){
@@ -967,13 +1123,24 @@ function walkBigFile(bigFilePath, validator, isVerbose, writeStream){
             console.log('Walk complete.')
         }
 
-        if(isVerbose){
+        if(options["dump"]){
             console.log("")
             console.log("FINAL OBJECT")
             console.log('===================================================================================================')
             console.log(JSON.stringify(rootObject))
             console.log('===================================================================================================')    
             console.log("")
+        }
+
+        if(startTimestamp){
+            let endTimestamp = DateTime.now();
+            var diffInSeconds = endTimestamp.diff(startTimestamp, 'seconds');
+            diffInSeconds.toObject(); //=> { months: 1 }
+            
+            console.log("Duration:          " + get(diffInSeconds.toObject(), "seconds") + " sec")
+        }
+        if(options["stats"]){
+            console.log("Number of Matches: " + matchCount)
         }
     });
 }
@@ -982,6 +1149,8 @@ if(command === "walk"){
     if(typeof options["file"] === "string"){
 
         console.log("walking file: " + options["file"]);
+        let startTimestamp = DateTime.now();
+        
         if(options["verbose"]){
             console.log("")
             console.log("")
@@ -1016,7 +1185,8 @@ if(command === "walk"){
                 mode: 0o666,
                 autoClose: true,
                 emitClose: true,
-                start: 0
+                start: 0,
+                highWaterMark: options["memory"]
             });
             writeStream.on("open", () => {
                 console.log("Stream opened");
@@ -1036,7 +1206,7 @@ if(command === "walk"){
         }
 
         
-        walkBigFile(options["file"], null, options["verbose"], null) 
+        walkBigFile(options["file"], null, options["verbose"], null, startTimestamp) 
     }
 }
 
@@ -1044,6 +1214,8 @@ if(command === "walk-and-match"){
     if(typeof options["file"] === "string"){
 
         console.log("walking file: " + options["file"]);
+        let startTimestamp = DateTime.now();
+
         if(options["debug"]){
             console.log("")
             console.log("")
@@ -1078,7 +1250,8 @@ if(command === "walk-and-match"){
                 mode: 0o666,
                 autoClose: true,
                 emitClose: true,
-                start: 0
+                start: 0,
+                highWaterMark: options["memory"]
             });
             writeStream.on("open", () => {
                 console.log("Stream opened");
@@ -1118,7 +1291,7 @@ if(command === "walk-and-match"){
 
                 const validator = ajv.compile(JSON.parse(schemaData));
 
-                walkBigFile(options["file"], validator, options["verbose"], writeStream)
+                walkBigFile(options["file"], validator, options["verbose"], writeStream, startTimestamp)
                 
                 console.log('==============================================================')
             });
@@ -1132,6 +1305,8 @@ if(command === "extract"){
     if(typeof options["file"] === "string"){
 
         console.log("walking file: " + options["file"]);
+        let startTimestamp = DateTime.now();
+
         if(options["debug"]){
             console.log("")
             console.log("")
@@ -1166,7 +1341,8 @@ if(command === "extract"){
                 mode: 0o666,
                 autoClose: true,
                 emitClose: true,
-                start: 0
+                start: 0,
+                highWaterMark: options["memory"]
             });
             writeStream.on("open", () => {
                 console.log("Stream opened");
@@ -1206,7 +1382,7 @@ if(command === "extract"){
 
                 const validator = ajv.compile(JSON.parse(schemaData));
 
-                walkBigFile(options["file"], validator, options["verbose"], writeStream)
+                walkBigFile(options["file"], validator, options["verbose"], writeStream, startTimestamp)
                 
                 console.log('==============================================================')
             });

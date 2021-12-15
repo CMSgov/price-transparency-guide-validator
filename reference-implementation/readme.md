@@ -2,6 +2,13 @@
 Base utility template for testing schemas.  Based on `bento-box` utility.
 
 
+#### Benchmarks  
+
+- Can generate ~10GB+ randomized sample files.
+- Can generate 50,000 entries into a BigJSON file in 10 seconds.
+- Can extract 50,000 BigJSON objects into NDJSON lines in 307 seconds.
+- Extracts 163 records into NDJSON per second.
+
 #### Installation  
 
 ```bash
