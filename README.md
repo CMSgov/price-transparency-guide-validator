@@ -16,6 +16,22 @@ cd reference-implementation
 npm install -g .
 ```
 
+#### Compiling C++ Dependencies
+
+These installation instructions assume a Mac environment.  
+
+```bash
+# check on international licensing here (Chinese multinational corp)
+git clone https://github.com/Tencent/rapidjson  
+
+mkdir build
+cd build
+
+# build using the g++ compiler
+cmake -DCMAKE_CXX_COMPILER=/usr/bin/g++ ..
+```
+
+
 #### Usage
 
 ```bash
@@ -67,6 +83,8 @@ cd output
 cd output
 open -a "Google Chrome" index.html
 ```
+
+
 
 #### References  
 

@@ -7,7 +7,7 @@
 let fs = require("fs");
 let boxen = require("boxen");
 let yargs = require("yargs/yargs");
-const { hideBin } = require('yargs/helpers')
+const { hideBin } = require('yargs/helpers');
 
 let axios = require("axios");
 
@@ -49,13 +49,20 @@ const { DateTime } = require("luxon");
 const { match } = require("assert");
 const { unset } = require("lodash");
 
+const { exec } = require("child_process");
+
 // import boxen from "boxen";
 // import yargs from "yargs";
 // import axios frofm "axios";
 
 let options = yargs(hideBin(process.argv))
  .usage("Usage: validator-tool <cmd> [args]")
- .config({"url": "http://localhost:3000/baseR4/metadata", "stats": true, "memory": 10000000})
+ .config({
+     "url": "http://localhost:3000/baseR4/metadata", 
+     "launch-command": "ls -la",
+     "stats": true, 
+     "memory": 10000000
+    })
  .command("readfile",   "Read a file", function (yargs, helpOrVersionSet) {
     return yargs.option('save', {
       alias: 's'
@@ -69,6 +76,7 @@ let options = yargs(hideBin(process.argv))
  .command("walk",           "Walk a large JSON record via streaming.")
  .command("walk-and-match", "Walk a large JSON record and validate.")
  .command("extract",        "Extract matching schemas from a large JSON file.")
+ .command("launch",         "Launch an external C++ program")
 
 //  .command("minify",  "Minify the JSON record with a mapping file.")
 //  .option("decompress", { describe: "Decompress the JSON record." })
@@ -86,6 +94,7 @@ let options = yargs(hideBin(process.argv))
  .option("resource-type",  { describe: "Define a default FHIR resource type for extraction."  })
  .option("tetris",         { describe: "Remove objects from memory after theyve been matched and validated." })
  .option("dump",           { describe: "Perform a memory dump at the end of the run." })
+ .option("launch-command", { describe: "External command to launch.  Defaults to 'ls -la'" })
 
 
  .example([
@@ -135,6 +144,22 @@ if(options["fetch"]){
     });   
 }
 
+
+if(command === "launch"){
+    console.log("Launching command: " + get(options, 'launch-command'))
+
+    exec(get(options, 'launch-command'), (error, stdout, stderr) => {
+        if (error) {
+            console.log(`error: ${error.message}`);
+            return;
+        }
+        if (stderr) {
+            console.log(`stderr: ${stderr}`);
+            return;
+        }
+        console.log(`stdout: ${stdout}`);
+    });
+}
 
 if(command === "readfile"){
     if(typeof options["file"] === "string"){
