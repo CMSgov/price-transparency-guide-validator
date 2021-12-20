@@ -94,7 +94,7 @@ let options = yargs(hideBin(process.argv))
  .option("resource-type",  { describe: "Define a default FHIR resource type for extraction."  })
  .option("tetris",         { describe: "Remove objects from memory after theyve been matched and validated." })
  .option("dump",           { describe: "Perform a memory dump at the end of the run." })
- .option("launch-command", { describe: "External command to launch.  Defaults to 'ls -la'" })
+ .option("command",        { describe: "External command to launch.  Defaults to 'ls -la'" })
 
 
  .example([
