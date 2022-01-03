@@ -17,6 +17,7 @@
       },
       "required": [ "name", "billing_code_type", "billing_code_type_version", "billing_code", "allowed_amounts", "description"]
     },
+
     "allowed_amounts": {
       "type": "object",
       "properties": {
@@ -41,11 +42,11 @@
           "uniqueItems": true
         },
         "billing_class": {
-            "enum": [
-              "professional",
-              "institutional"
-            ]
-          },
+           "enum": [
+             "professional",
+             "institutional"
+           ]
+         },
         "payments": {
           "type": "array",
           "items": { "$ref": "#/definitions/payments" },
@@ -54,15 +55,15 @@
       },
       "required": [ "tin", "billing_class", "payments" ],
       "if": {
-          "properties": {
-            "billing_class": { "const": "professional" }
-          }
-        },
-        "then": {
-          "required": [
-            "service_code"
-          ]
-        }
+         "properties": {
+           "billing_class": { "const": "professional" }
+         }
+       },
+       "then": {
+         "required": [
+           "service_code"
+         ]
+       }
     },
 
     "payments": {
@@ -102,6 +103,7 @@
       "required": ["plan_name", "plan_id_type", "plan_id", "plan_market_type"]
     }
   },
+
   "type": "object",
   "properties": {
     "reporting_entity_name": { "type": "string" },
