@@ -1,9 +1,10 @@
 # BUILD:  docker build -t rapidjson-debian .
 # RUN:    docker run -it -v "$PWD"/../..:/rapidjson rapidjson-debian
 
-FROM ubuntu:20.04
+#FROM ubuntu:20.04
+FROM alpine
 
-RUN apt-get update && apt-get install -y g++ cmake doxygen valgrind
+RUN apk update && apk add g++ cmake doxygen valgrind
 COPY ./schemavalidator.cpp /
 COPY ./rapidjson /rapidjson
 RUN g++ schemavalidator.cpp -o validator
