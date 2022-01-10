@@ -20,3 +20,6 @@ For Example:
 `docker run` Docker will run the docker image passed to it.
 `-v <host file>/:/<docker directory>` The <docker directory> will attempt to mount the absolute path directory on the host machine
 
+### Build Docker Container with a specific github tag
+List of tags can be found [here](https://github.com/CMSgov/price-transparency-guide/tags)
+`docker build -t shaselton/validator --build-arg VERSION=v0.2 .`
