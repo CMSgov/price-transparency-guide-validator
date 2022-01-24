@@ -16,6 +16,9 @@ Copy docker image hash found from the `docker images` command.
 For Example:
 `docker run -v $(pwd)/schemas/:/schemas d38ebf40991947a378094e234b4fdb7adeb715da605b704cad07e6714d4b8867 schemas/in-network-rates/in-network-rates.json schemas/in-network-rates/in-network-rates-fee-for-service-sample.json`
 
+Example with optional output file:
+`docker run -v $(pwd)/schemas/:/schemas -v $(pwd)/output/:/output abdf0d8512a8 schemas/in-network-rates/in-network-rates.json schemas/in-network-rates/in-network-rates-fee-for-service-single-plan-sample.json output/my_output.txt`
+
 #### Commands
 `docker run` Docker will run the docker image passed to it.
 `-v <host file>/:/<docker directory>` The <docker directory> will attempt to mount the absolute path directory on the host machine

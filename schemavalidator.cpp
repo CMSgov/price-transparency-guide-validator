@@ -20,7 +20,7 @@ using namespace rapidjson;
 typedef GenericValue<UTF8<>, CrtAllocator > ValueType;
 
 // Forward ref
-static void CreateErrorMessages(const ValueType& errors, size_t depth, const char* context);
+static void CreateErrorMessages(const ValueType& errors, FILE* outFile,  size_t depth, const char* context);
 
 // Convert GenericValue to std::string
 static std::string GetString(const ValueType& val) {
@@ -50,7 +50,7 @@ static std::string GetString(const ValueType& val) {
 // {"errorCode": <code>, "instanceRef": "<pointer>", "schemaRef": "<pointer>" }
 // Additional properties may be present for use as inserts.
 // An "errors" property may be present if there are child errors.
-static void HandleError(const char* errorName, const ValueType& error, size_t depth, const char* context) {
+static void HandleError(const char* errorName, const ValueType& error, FILE* outFile, size_t depth, const char* context) {
   if (!error.ObjectEmpty()) {
     // Get error code and look up error message text (English)
     int code = error["errorCode"].GetInt();
@@ -78,13 +78,16 @@ static void HandleError(const char* errorName, const ValueType& error, size_t de
       }
     }
     // Output error message, references, context
-    std::string indent(depth * 2, ' ');
-    std::cout << indent << "Error Name: " << errorName << std::endl;
-    std::cout << indent << "Message: " << message.c_str() << std::endl;
-    std::cout << indent << "Instance: " << error["instanceRef"].GetString() << std::endl;
-    std::cout << indent << "Schema: " << error["schemaRef"].GetString() << std::endl;
-    if (depth > 0) std::cout << indent << "Context: " << context << std::endl;
-    std::cout << std::endl;
+    std::string indentStr(depth * 2, ' ');
+    const char *indent = indentStr.c_str();
+    fprintf(outFile, "%sError Name: %s\n", indent, errorName);
+    fprintf(outFile, "%sMessage: %s\n", indent, message.c_str());
+    fprintf(outFile, "%sInstance: %s\n", indent, error["instanceRef"].GetString());
+    fprintf(outFile, "%sSchema: %s\n", indent, error["schemaRef"].GetString());
+    if (depth > 0) {
+        fprintf(outFile, "%sContext: %s\n", indent, context);
+    }
+    fprintf(outFile, "\n");
 
     // If child errors exist, apply the process recursively to each error structure.
     // This occurs for "oneOf", "allOf", "anyOf" and "dependencies" errors, so pass the error name as context.
@@ -96,14 +99,14 @@ static void HandleError(const char* errorName, const ValueType& error, size_t de
         // "anyOf": {"errorCode": ..., "errors":[{"pattern": {"errorCode\": ...\"}}, {"pattern": {"errorCode\": ...}}]
         for (ValueType::ConstValueIterator errorsItr = childErrors.Begin();
              errorsItr != childErrors.End(); ++errorsItr) {
-          CreateErrorMessages(*errorsItr, depth, errorName);
+          CreateErrorMessages(*errorsItr, outFile, depth, errorName);
         }
       } else if (childErrors.IsObject()) {
         // Object - each member is an error structure - example
         // "dependencies": {"errorCode": ..., "errors": {"address": {"required": {"errorCode": ...}}, "name": {"required": {"errorCode": ...}}}
         for (ValueType::ConstMemberIterator propsItr = childErrors.MemberBegin();
              propsItr != childErrors.MemberEnd(); ++propsItr) {
-          CreateErrorMessages(propsItr->value, depth, errorName);
+          CreateErrorMessages(propsItr->value, outFile, depth, errorName);
         }
       }
     }
@@ -112,7 +115,7 @@ static void HandleError(const char* errorName, const ValueType& error, size_t de
 
 // Create error message for all errors in an error structure
 // Context is used to indicate whether the error structure has a parent 'dependencies', 'allOf', 'anyOf' or 'oneOf' error
-static void CreateErrorMessages(const ValueType& errors, size_t depth = 0, const char* context = 0) {
+static void CreateErrorMessages(const ValueType& errors, FILE* outFile, size_t depth = 0, const char* context = 0) {
     // Each member property contains one or more errors of a given type
     for (ValueType::ConstMemberIterator errorTypeItr = errors.MemberBegin(); errorTypeItr != errors.MemberEnd(); ++errorTypeItr) {
         const char* errorName = errorTypeItr->name.GetString();
@@ -120,19 +123,36 @@ static void CreateErrorMessages(const ValueType& errors, size_t depth = 0, const
         if (errorContent.IsArray()) {
             // Member is an array where each item is an error - eg "type": [{"errorCode": ...}, {"errorCode": ...}]
             for (ValueType::ConstValueIterator contentItr = errorContent.Begin(); contentItr != errorContent.End(); ++contentItr) {
-                HandleError(errorName, *contentItr, depth, context);
+                HandleError(errorName, *contentItr, outFile, depth, context);
             }
         } else if (errorContent.IsObject()) {
             // Member is an object which is a single error - eg "type": {"errorCode": ... }
-            HandleError(errorName, errorContent, depth, context);
+            HandleError(errorName, errorContent, outFile, depth, context);
         }
     }
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: schemavalidator schema.json input.json\n");
+    if (argc < 3 || argc > 4) {
+        fprintf(stderr, "Usage: schemavalidator schema.json input.json <output.txt>\n");
         return EXIT_FAILURE;
+    }
+
+    // if an output file is specified, try to open it for writing
+    FILE *outFile;
+    FILE *errFile;
+    bool fileOutput = false;
+    if (argc == 4) {
+        outFile = fopen(argv[3], "w");
+        if (!outFile) {
+            printf("Could not open file '%s' for output\n", argv[3]);
+            return -1;
+        }
+        errFile = outFile;
+        fileOutput = true;
+    } else {
+      outFile = stdout;
+      errFile = stderr;
     }
 
     // Read a JSON schema from file into Document
@@ -151,17 +171,23 @@ int main(int argc, char *argv[]) {
         //printf("directory: '%s'\n", std::system(cmd.c_str()));
         //printf("directory: '%s'\n", std::system("cat schemas/in-network-rates/in-network-rates-fee-for-service-sample.json"));
         if (!fp) {
-            printf("Schema file '%s' not found\n", argv[1]);
+            fprintf(outFile, "Schema file '%s' not found\n", argv[1]);
+            if (fileOutput) {
+                fclose(outFile);
+            }
             return -1;
         }
         FileReadStream fs(fp, buffer, sizeof(buffer));
         d.ParseStream(fs);
         if (d.HasParseError()) {
-            fprintf(stderr, "Schema file '%s' is not a valid JSON\n", argv[1]);
-            fprintf(stderr, "Error(offset %u): %s\n",
+            fprintf(errFile, "Schema file '%s' is not a valid JSON\n", argv[1]);
+            fprintf(errFile, "Error(offset %u): %s\n",
                 static_cast<unsigned>(d.GetErrorOffset()),
                 GetParseError_En(d.GetParseError()));
             fclose(fp);
+            if (fileOutput) {
+                fclose(outFile);
+            }
             return EXIT_FAILURE;
         }
         fclose(fp);
@@ -175,40 +201,49 @@ int main(int argc, char *argv[]) {
     Reader reader;
     FILE *fp2 = fopen(argv[2], "r");
     if (!fp2) {
-        printf("JSON file '%s' not found\n", argv[2]);
+        fprintf(outFile, "JSON file '%s' not found\n", argv[2]);
+        if (fileOutput) {
+            fclose(outFile);
+        }
         return -1;
     }
     FileReadStream is(fp2, buffer, sizeof(buffer));
     if (!reader.Parse(is, validator) && reader.GetParseErrorCode() != kParseErrorTermination) {
         // Schema validator error would cause kParseErrorTermination, which will handle it in next step.
-        fprintf(stderr, "Input is not a valid JSON\n");
-        fprintf(stderr, "Error(offset %u): %s\n",
+        fprintf(errFile, "Input is not a valid JSON\n");
+        fprintf(errFile, "Error(offset %u): %s\n",
             static_cast<unsigned>(reader.GetErrorOffset()),
             GetParseError_En(reader.GetParseErrorCode()));
     }
 
     // Check the validation result
     if (validator.IsValid()) {
-        printf("Input JSON is valid.\n");
+        fprintf(outFile, "Input JSON is valid.\n");
+        if (fileOutput) {
+            fclose(outFile);
+        }
         return EXIT_SUCCESS;
     }
     else {
-        printf("Input JSON is invalid.\n");
+        fprintf(outFile, "Input JSON is invalid.\n");
         StringBuffer sb;
         validator.GetInvalidSchemaPointer().StringifyUriFragment(sb);
-        fprintf(stderr, "Invalid schema: %s\n", sb.GetString());
-        fprintf(stderr, "Invalid keyword: %s\n", validator.GetInvalidSchemaKeyword());
-        fprintf(stderr, "Invalid code: %d\n", validator.GetInvalidSchemaCode());
-        fprintf(stderr, "Invalid message: %s\n", GetValidateError_En(validator.GetInvalidSchemaCode()));
+        fprintf(errFile, "Invalid schema: %s\n", sb.GetString());
+        fprintf(errFile, "Invalid keyword: %s\n", validator.GetInvalidSchemaKeyword());
+        fprintf(errFile, "Invalid code: %d\n", validator.GetInvalidSchemaCode());
+        fprintf(errFile, "Invalid message: %s\n", GetValidateError_En(validator.GetInvalidSchemaCode()));
         sb.Clear();
         validator.GetInvalidDocumentPointer().StringifyUriFragment(sb);
-        fprintf(stderr, "Invalid document: %s\n", sb.GetString());
+        fprintf(errFile, "Invalid document: %s\n", sb.GetString());
         // Detailed violation report is available as a JSON value
         sb.Clear();
         PrettyWriter<StringBuffer> w(sb);
         validator.GetError().Accept(w);
-        fprintf(stderr, "Error report:\n%s\n", sb.GetString());
-        CreateErrorMessages(validator.GetError());
+        fprintf(errFile, "Error report:\n%s\n", sb.GetString());
+        CreateErrorMessages(validator.GetError(), outFile);
+        if (fileOutput) {
+            fclose(outFile);
+        }
         return EXIT_FAILURE;
     }
 }
