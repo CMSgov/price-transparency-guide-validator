@@ -9,6 +9,7 @@
 #include "rapidjson/include/rapidjson/schema.h"
 #include "rapidjson/include/rapidjson/stringbuffer.h"
 #include "rapidjson/include/rapidjson/prettywriter.h"
+#include <tclap/CmdLine.h>
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -133,19 +134,41 @@ static void CreateErrorMessages(const ValueType& errors, FILE* outFile, size_t d
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3 || argc > 4) {
-        fprintf(stderr, "Usage: schemavalidator schema.json input.json <output.txt>\n");
-        return EXIT_FAILURE;
+    std::string schemaPath;
+    std::string dataPath;
+    std::string outputPath;
+    int bufferSize = 4069;
+
+    try {
+      TCLAP::CmdLine cmd("validator for machine-readable files", ' ', "0.1");
+      TCLAP::UnlabeledValueArg<std::string> schemaArg("schema-path", "path to schema file", true, "", "path");
+      TCLAP::UnlabeledValueArg<std::string> dataArg("data-path", "path to data file", true, "", "path");
+      TCLAP::ValueArg<std::string> outputArg("o", "output-path", "path to output file", false, "", "path");
+      TCLAP::ValueArg<int> bufferArg("b", "buffer-size", "buffer size in bytes", false, 4069, "integer");
+      TCLAP::ValueArg<std::string> versionArg("s", "schema-version", "schema version to validate against", false, "0.8.0", "version string");
+      cmd.add(schemaArg);
+      cmd.add(dataArg);
+      cmd.add(outputArg);
+      cmd.add(versionArg);
+      cmd.add(bufferArg);
+      cmd.parse(argc, argv);
+      schemaPath = schemaArg.getValue();
+      dataPath = dataArg.getValue();
+      outputPath = outputArg.getValue();
+      bufferSize = bufferArg.getValue();
+    } catch (TCLAP::ArgException &e) {
+      fprintf(stderr, e.error().c_str());
+      return EXIT_FAILURE;
     }
 
     // if an output file is specified, try to open it for writing
     FILE *outFile;
     FILE *errFile;
     bool fileOutput = false;
-    if (argc == 4) {
-        outFile = fopen(argv[3], "w");
+    if (outputPath.length() > 0) {
+        outFile = fopen(outputPath.c_str(), "w");
         if (!outFile) {
-            printf("Could not open file '%s' for output\n", argv[3]);
+            printf("Could not open file '%s' for output\n", outputPath);
             return -1;
         }
         errFile = outFile;
@@ -157,21 +180,14 @@ int main(int argc, char *argv[]) {
 
     // Read a JSON schema from file into Document
     Document d;
-    char buffer[4069];
+    char buffer[bufferSize];
 
     {
-        FILE *fp = fopen(argv[1], "r");
+        FILE *fp = fopen(schemaPath.c_str(), "r");
         std::string cmd("cat ");
-        cmd += argv[1];
-        /*
-        printf("Schema file is here: '%s'\n", argv[0]);
-        printf("Schema file is here: '%s'\n", argv[1]);
-        printf("Schema file is here: '%s'\n", argv[2]);
-        */
-        //printf("directory: '%s'\n", std::system(cmd.c_str()));
-        //printf("directory: '%s'\n", std::system("cat schemas/in-network-rates/in-network-rates-fee-for-service-sample.json"));
+        cmd += schemaPath;
         if (!fp) {
-            fprintf(outFile, "Schema file '%s' not found\n", argv[1]);
+            fprintf(outFile, "Schema file '%s' not found\n", schemaPath);
             if (fileOutput) {
                 fclose(outFile);
             }
@@ -180,7 +196,7 @@ int main(int argc, char *argv[]) {
         FileReadStream fs(fp, buffer, sizeof(buffer));
         d.ParseStream(fs);
         if (d.HasParseError()) {
-            fprintf(errFile, "Schema file '%s' is not a valid JSON\n", argv[1]);
+            fprintf(errFile, "Schema file '%s' is not a valid JSON\n", schemaPath);
             fprintf(errFile, "Error(offset %u): %s\n",
                 static_cast<unsigned>(d.GetErrorOffset()),
                 GetParseError_En(d.GetParseError()));
@@ -199,9 +215,9 @@ int main(int argc, char *argv[]) {
     // Use reader to parse the JSON in stdin, and forward SAX events to validator
     SchemaValidator validator(sd);
     Reader reader;
-    FILE *fp2 = fopen(argv[2], "r");
+    FILE *fp2 = fopen(dataPath.c_str(), "r");
     if (!fp2) {
-        fprintf(outFile, "JSON file '%s' not found\n", argv[2]);
+        fprintf(outFile, "JSON file '%s' not found\n", dataPath);
         if (fileOutput) {
             fclose(outFile);
         }
