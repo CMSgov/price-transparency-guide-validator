@@ -40,12 +40,16 @@ async function runContainer(schemaPath: string, dataPath: string) {
   const dataFile = path.basename(absoluteDataPath);
   const newContainerId = await util
     .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
-    .then(result => result.stdout.trim());
+    .then(result => result.stdout.trim())
+    .catch(reason => {
+      console.log(reason.stderr);
+      return '';
+    });
   if (newContainerId.length > 0) {
     // incredibly unsafe but temporarily useful, do not merge to main
     return util
       .promisify(exec)(
-        `docker run -v ${schemaDir}:/schema/ -v ${dataDir}:/data/ ${newContainerId} schema/${schemaFile} data/${dataFile}`
+        `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${newContainerId} "schema/${schemaFile}" "data/${dataFile}"`
       )
       .then(result => {
         console.log(result.stdout);
