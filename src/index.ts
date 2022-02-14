@@ -3,7 +3,7 @@
 import util from 'util';
 import path from 'path';
 import { exec } from 'child_process';
-import { program } from 'commander';
+import { program, CommandOptions } from 'commander';
 import NodeGit from 'nodegit';
 import fs from 'fs-extra';
 import temp from 'temp';
@@ -11,55 +11,86 @@ import temp from 'temp';
 const SCHEMA_REPO_URL = 'https://github.com/CMSgov/price-transparency-guide.git';
 const SCHEMA_REPO_FOLDER = path.normalize(path.join(__dirname, '..', 'schema-repo'));
 
-program
-  .name('mr-validator')
-  .usage('data-file> <schema-version> [options]')
-  .argument('<data-file>', 'path to data file to validate')
-  .argument('<schema-version>', 'version of schema to use for validation')
-  .option('-o, --out <out>', 'output path')
-  .parse(process.argv);
-
-temp.track();
-
-useRepoVersion(program.args[1]).then(schemaPath => {
-  if (schemaPath != null) {
-    runContainer(schemaPath, program.args[0]);
-  } else {
-    console.log('No schema available - not validating.');
-  }
+main().catch(error => {
+  console.log(`Encountered an unexpected error: ${error}`);
 });
 
+async function main() {
+  program
+    .name('mr-validator')
+    .command('validate', { isDefault: true })
+    .usage('<data-file> <schema-version> [options]')
+    .argument('<data-file>', 'path to data file to validate')
+    .argument('<schema-version>', 'version of schema to use for validation')
+    .option('-o, --out <out>', 'output path')
+    .action(validate);
+
+  program.command('update').action(update);
+
+  program.parseAsync(process.argv);
+}
+
+async function validate(dataFile: string, schemaVersion: string, options: CommandOptions) {
+  temp.track();
+
+  useRepoVersion(schemaVersion).then(schemaPath => {
+    if (schemaPath != null) {
+      runContainer(schemaPath, dataFile);
+    } else {
+      console.log('No schema available - not validating.');
+    }
+  });
+}
+
+async function update() {
+  try {
+    // check if the repo exists. if not, clone it. if it exists, fetch updates.
+    if (!fs.existsSync(path.join(SCHEMA_REPO_FOLDER, '.git'))) {
+      await util.promisify(exec)(`git clone ${SCHEMA_REPO_URL} "${SCHEMA_REPO_FOLDER}"`);
+      console.log('Retrieved schemas.');
+    } else {
+      await util.promisify(exec)(`git -C "${SCHEMA_REPO_FOLDER}" pull --no-rebase -t`);
+      console.log('Updated schemas.');
+    }
+  } catch (error) {
+    console.log(`Error when updating available schemas: ${error}`);
+  }
+}
+
 async function runContainer(schemaPath: string, dataPath: string) {
-  // figure out mount for schema file
-  const absoluteSchemaPath = path.resolve(schemaPath);
-  const schemaDir = path.dirname(absoluteSchemaPath);
-  const schemaFile = path.basename(absoluteSchemaPath);
-  // figure out mount for data file
-  const absoluteDataPath = path.resolve(dataPath);
-  const dataDir = path.dirname(absoluteDataPath);
-  const dataFile = path.basename(absoluteDataPath);
-  const newContainerId = await util
-    .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
-    .then(result => result.stdout.trim())
-    .catch(reason => {
-      console.log(reason.stderr);
-      return '';
-    });
-  if (newContainerId.length > 0) {
-    // incredibly unsafe but temporarily useful, do not merge to main
-    return util
-      .promisify(exec)(
-        `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${newContainerId} "schema/${schemaFile}" "data/${dataFile}"`
-      )
-      .then(result => {
-        console.log(result.stdout);
-      })
+  try {
+    // figure out mount for schema file
+    const absoluteSchemaPath = path.resolve(schemaPath);
+    const schemaDir = path.dirname(absoluteSchemaPath);
+    const schemaFile = path.basename(absoluteSchemaPath);
+    // figure out mount for data file
+    const absoluteDataPath = path.resolve(dataPath);
+    const dataDir = path.dirname(absoluteDataPath);
+    const dataFile = path.basename(absoluteDataPath);
+    const newContainerId = await util
+      .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
+      .then(result => result.stdout.trim())
       .catch(reason => {
-        console.log(reason.stdout);
         console.log(reason.stderr);
+        return '';
       });
-  } else {
-    console.log('Could not find a validator docker container.');
+    if (newContainerId.length > 0) {
+      return util
+        .promisify(exec)(
+          `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${newContainerId} "schema/${schemaFile}" "data/${dataFile}"`
+        )
+        .then(result => {
+          console.log(result.stdout);
+        })
+        .catch(reason => {
+          console.log(reason.stdout);
+          console.log(reason.stderr);
+        });
+    } else {
+      console.log('Could not find a validator docker container.');
+    }
+  } catch (error) {
+    console.log(`Error when running validator container: ${error}`);
   }
 }
 
@@ -93,7 +124,7 @@ async function useRepoVersion(schemaVersion: string) {
         )}`
       );
     }
-  } catch (badtime) {
-    console.log(badtime);
+  } catch (error) {
+    console.log(`Error when accessing schema: ${error}`);
   }
 }
