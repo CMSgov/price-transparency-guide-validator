@@ -18,14 +18,19 @@ main().catch(error => {
 async function main() {
   program
     .name('mr-validator')
+    .description('Tool for validating health coverage machine-readable files.')
     .command('validate', { isDefault: true })
+    .description('Validate a file against a specific published version of the schema.')
     .usage('<data-file> <schema-version> [options]')
     .argument('<data-file>', 'path to data file to validate')
     .argument('<schema-version>', 'version of schema to use for validation')
     .option('-o, --out <out>', 'output path')
     .action(validate);
 
-  program.command('update').action(update);
+  program
+    .command('update')
+    .description('Update the available schemas from the CMS repository.')
+    .action(update);
 
   program.parseAsync(process.argv);
 }
