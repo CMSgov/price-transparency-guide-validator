@@ -1,0 +1,81 @@
+name: Validator
+
+on: [ push, pull_request ]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        name: checkout repository to github runner
+        uses: actions/checkout@v2
+      -
+        name: make directory for validator, compile validator, move validator to directory for export as an artifact
+        run: |
+          mkdir -p validator_tool/
+          g++ schemavalidator.cpp -o validator
+          mv validator validator_tool/
+      -
+        name: upload the validator as artifacts to be referenced in other jobs
+        uses: actions/upload-artifact@v2
+        with:
+          name: download validator tool as artifact on github runner
+          path: validator_tool/validator
+
+
+  in_network_schema:
+    needs: compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        in_network_schema: ["schemas/in-network-rates/in-network-rates.json"]
+        in_network_input: ["data-files/in-network-rates-fee-for-service-sample.json", "data-files/in-network-rates-borked.json"]
+    steps:
+      -
+        name: checkout repository to github runner
+        uses: actions/checkout@v2
+      -
+        uses: actions/download-artifact@v2
+        with:
+          name: download validator tool as artifact on github runner
+          path: validator_tool/validator
+      -
+        name: chmod validator file
+        run: |
+          chmod ugo+rwx validator
+        working-directory: validator_tool/validator
+      -
+        name: run in-network json file tests
+        run: |
+          validator_tool/validator/validator ${{ matrix.in_network_schema }} ${{ matrix.in_network_input }}
+  
+  
+
+  allowed_amounts_schema:
+    if: ${{ always() }}
+    needs: in_network_schema
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        allowed_amounts_schema: ["schemas/allowed-amounts/allowed-amounts.json"]
+        allowed_amounts_input: ["data-files/allowed-amounts.json"]
+    steps:
+      -
+        name: checkout repository to github runner
+        uses: actions/checkout@v2
+      -
+        uses: actions/download-artifact@v2
+        with:
+          name: download validator tool as artifact on github runner
+          path: validator_tool/validator
+      -
+        name: chmod validator file
+        run: |
+          chmod ugo+rwx validator
+        working-directory: validator_tool/validator
+      -
+        name: run allowed amounts json file tests
+        run: |
+          validator_tool/validator/validator ${{ matrix.allowed_amounts_schema }} ${{ matrix.allowed_amounts_input }}
