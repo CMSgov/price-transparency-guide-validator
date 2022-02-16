@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
       outputPath = outputArg.getValue();
       bufferSize = bufferArg.getValue();
     } catch (TCLAP::ArgException &e) {
-      fprintf(stderr, e.error().c_str());
+      fprintf(stderr, "%s", e.error().c_str());
       return EXIT_FAILURE;
     }
 
@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
     if (outputPath.length() > 0) {
         outFile = fopen(outputPath.c_str(), "w");
         if (!outFile) {
-            printf("Could not open file '%s' for output\n", outputPath);
+            printf("Could not open file '%s' for output\n", outputPath.c_str());
             return -1;
         }
         errFile = outFile;
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
         std::string cmd("cat ");
         cmd += schemaPath;
         if (!fp) {
-            fprintf(outFile, "Schema file '%s' not found\n", schemaPath);
+            fprintf(outFile, "Schema file '%s' not found\n", schemaPath.c_str());
             if (fileOutput) {
                 fclose(outFile);
             }
@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
         FileReadStream fs(fp, buffer, sizeof(buffer));
         d.ParseStream(fs);
         if (d.HasParseError()) {
-            fprintf(errFile, "Schema file '%s' is not a valid JSON\n", schemaPath);
+            fprintf(errFile, "Schema file '%s' is not a valid JSON\n", schemaPath.c_str());
             fprintf(errFile, "Error(offset %u): %s\n",
                 static_cast<unsigned>(d.GetErrorOffset()),
                 GetParseError_En(d.GetParseError()));
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
     Reader reader;
     FILE *fp2 = fopen(dataPath.c_str(), "r");
     if (!fp2) {
-        fprintf(outFile, "JSON file '%s' not found\n", dataPath);
+        fprintf(outFile, "JSON file '%s' not found\n", dataPath.c_str());
         if (fileOutput) {
             fclose(outFile);
         }
