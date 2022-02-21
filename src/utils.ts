@@ -56,7 +56,7 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
   }
 }
 
-function buildRunCommand(
+export function buildRunCommand(
   schemaPath: string,
   dataPath: string,
   outputPath: string,
