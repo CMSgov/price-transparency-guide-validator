@@ -41,7 +41,7 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
       temp.track();
       const schemaDir = temp.mkdirSync('schemas');
       const schemaFilePath = path.join(schemaDir, 'schema.json');
-      fs.writeFileSync(schemaFilePath, blob.content());
+      fs.writeFileSync(schemaFilePath, blob.content(), { encoding: 'utf-8' });
       return schemaFilePath;
     } else {
       // we didn't find your tag. maybe you mistyped it, so show the available ones.
