@@ -1,81 +1,49 @@
-name: Validator
+name: Validator_Pytest
 
-on: [ push, pull_request ]
-
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
 jobs:
-  compile:
+  in_network_rates_schema_test:
     runs-on: ubuntu-latest
 
     steps:
       -
-        name: checkout repository to github runner
+        name: checkout repository
         uses: actions/checkout@v2
       -
-        name: make directory for validator, compile validator, move validator to directory for export as an artifact
+        name: install pytest
+        working-directory: ./tests
+        run: pip install -U pytest
+      -
+        name: compile
         run: |
-          mkdir -p validator_tool/
           g++ schemavalidator.cpp -o validator
-          mv validator validator_tool/
       -
-        name: upload the validator as artifacts to be referenced in other jobs
-        uses: actions/upload-artifact@v2
-        with:
-          name: download validator tool as artifact on github runner
-          path: validator_tool/validator
+        name: test schemas
+        working-directory: ./tests
+        run: pytest test_in_network_rates_schema.py
 
-
-  in_network_schema:
-    needs: compile
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        in_network_schema: ["schemas/in-network-rates/in-network-rates.json"]
-        in_network_input: ["data-files/in-network-rates-fee-for-service-sample.json", "data-files/in-network-rates-borked.json"]
-    steps:
-      -
-        name: checkout repository to github runner
-        uses: actions/checkout@v2
-      -
-        uses: actions/download-artifact@v2
-        with:
-          name: download validator tool as artifact on github runner
-          path: validator_tool/validator
-      -
-        name: chmod validator file
-        run: |
-          chmod ugo+rwx validator
-        working-directory: validator_tool/validator
-      -
-        name: run in-network json file tests
-        run: |
-          validator_tool/validator/validator ${{ matrix.in_network_schema }} ${{ matrix.in_network_input }}
-  
-  
-
-  allowed_amounts_schema:
-    if: ${{ always() }}
-    needs: in_network_schema
+  allowed_amounts_schema_test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        allowed_amounts_schema: ["schemas/allowed-amounts/allowed-amounts.json"]
-        allowed_amounts_input: ["data-files/allowed-amounts.json"]
     steps:
       -
-        name: checkout repository to github runner
+        name: checkout repository
         uses: actions/checkout@v2
       -
-        uses: actions/download-artifact@v2
-        with:
-          name: download validator tool as artifact on github runner
-          path: validator_tool/validator
+        name: install pytest
+        working-directory: ./tests
+        run: pip install -U pytest
       -
-        name: chmod validator file
+        name: compile
         run: |
-          chmod ugo+rwx validator
-        working-directory: validator_tool/validator
+          g++ schemavalidator.cpp -o validator
       -
-        name: run allowed amounts json file tests
-        run: |
-          validator_tool/validator/validator ${{ matrix.allowed_amounts_schema }} ${{ matrix.allowed_amounts_input }}
+        name: test schemas
+        working-directory: ./tests
+        run: pytest test_allowed_amounts_schema.py
