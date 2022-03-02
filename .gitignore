@@ -3,3 +3,4 @@ out/**
 schema-repo/**
 coverage
 validator
+.vscode
