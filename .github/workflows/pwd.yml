@@ -1,0 +1,20 @@
+name: pwd
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  compile_and_upload_validator_executable:
+    runs-on: ubuntu-latest
+    
+    steps:
+      -
+        name: checkout repository to github runner
+        uses: actions/checkout@v2
+      -
+        name: print working directory
+        run: pwd

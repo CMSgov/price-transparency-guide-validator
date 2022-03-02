@@ -8,6 +8,28 @@ on:
     branches:
       - main
 jobs:
+  compile_and_upload_validator_executable:
+    runs-on: ubuntu-latest
+    
+    steps:
+      -
+        name: checkout repository to github runner
+        uses: actions/checkout@v2
+      -
+        name: install pytest
+        working-directory: ./tests
+        run: pip install -U pytest
+      -
+        name: compile validator
+        run: g++ schemavalidator.cpp -o validator
+      -
+        name: upload the validator as github artifact to be referenced in other jobs
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload validator tool as artifact on github runner
+          path: validator
+
+
   in_network_rates_schema_test:
     runs-on: ubuntu-latest
 
@@ -16,17 +38,14 @@ jobs:
         name: checkout repository
         uses: actions/checkout@v2
       -
-        name: install pytest
-        working-directory: ./tests
-        run: pip install -U pytest
-      -
-        name: compile
-        run: |
-          g++ schemavalidator.cpp -o validator
+        uses: actions/download-artifact@v2
+        with:
+          name: download validator tool as artifact on github runner
+          path: validator
       -
         name: test schemas
         working-directory: ./tests
-        run: pytest test_in_network_rates_schema.py
+        run: pytest test_in_network_rates_sample.py test_in_network_rates_fee_for_service_sample.py test_in_network_rates_fee_for_service_filetype.py test_in_network_rates_fee_for_service_fhirized.py test_in_network_rates_capitation.py
 
   allowed_amounts_schema_test:
     runs-on: ubuntu-latest
