@@ -30,5 +30,5 @@ def test_allowed_amounts():
     print("stderr: ", error)
     print("run: ", run)
     assert output == "Input JSON is valid.\n"
-    ```
+```
 
