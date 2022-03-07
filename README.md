@@ -32,3 +32,14 @@ def test_allowed_amounts():
     assert output == "Input JSON is valid.\n"
 ```
 
+# How I've been testing changes to pytests/yml file
+I forked the validator tool repository to make a mess separately, but to get it working on this branch, you could just change the section of the workflows .yml file that defines which branches it gets triggered on, here: 
+```
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+```
