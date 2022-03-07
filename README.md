@@ -2,8 +2,20 @@
  In .github/workflows/Validator.yml the messiest job is that of the allowed amounts tests. 
  This goes back to my initial idea of first fixing tests/allowed amounts/test_allowed_amounts_sample.py and tests/allowed amounts/test_allowed_amounts_borked.py then applying the fix to all other tests. 
 
+# How to run the tests 
+Here are the two main way's I've been invoking pytest but there is more detailed information on how to do that [here](https://docs.pytest.org/en/latest/how-to/usage.html)
+```
+// in directory where the test_*.py is located
+// this will run every test in the current directory
+pytest
+```
+and
+```
+//this will allow you to run specific tests, single test etc.
+pytest test_allowed_amounts_sample.py test_allowed_amounts_borked.py
+```
 
-#### Correct Subprocess.Popen structue
+# Correct Subprocess.Popen structue
 This is extremely finnicky so this is what I have found that works "best" so far, we are still however facing permissions issues in the github runner. This subprocess structure will be rolled out to the other tests as soon as we can get it working fully within github runner :)
 
 ```
