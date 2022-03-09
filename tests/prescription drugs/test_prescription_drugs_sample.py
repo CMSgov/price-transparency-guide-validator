@@ -1,14 +1,17 @@
 # Test data-files/prescription-drugs.json against the prescription drugs schema.
 import subprocess
 
-# check for exceptions thrown by the file itself
-def test_schema_raises_no_exception():
+# check for exceptions
+def test_prescription_drugs_raises_no_exception():
+    cmd = ["../../validator", "../../schemas/prescription-drugs.json", "../../data-files/prescription-drugs.json"]
     try:
-        schema_test_outcome = subprocess.call(["/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/validator", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/schemas/prescription-drugs.json", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/data-files/prescription-drugs.json"])
+        run = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except Exception as exc:
-        assert False, f"'prescription-drugs.json' raised an exception {exc}"
+        assert False, f"'in-network-rates-capitation-sample.json' raised an exception {exc}"
 
-# check if it validates successfully. 0 == success. 
-def test_allowed_amounts():
-    schema_test_outcome = subprocess.call(["/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/validator", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/schemas/prescription-drugs.json", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/data-files/prescription-drugs.json"])
-    assert schema_test_outcome == 0
+# check if it validates successfully. 0 == success.
+def test_prescription_drugs():
+    cmd = ["../../validator", "../../schemas/prescription-drugs.json", "../../data-files/prescription-drugs.json"]
+    run = subprocess.Popen(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    run.communicate()
+    assert run.returncode == 0

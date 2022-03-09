@@ -2,13 +2,16 @@
 import subprocess
 
 # check for exceptions
-def test_schema_raises_no_exception():
+def test_in_network_rates_fee_for_service_fhirized_raises_no_exception():
+    cmd = ["../../validator", "../../schemas/in-network-rates.json", "../../data-files/in-network-rates-fee-for-service-sample-fhirized.json"]
     try:
-        schema_test_outcome = subprocess.call(["/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/validator", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/schemas/in-network-rates.json", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/data-files/in-network-rates-fee-for-service-sample-fhirized.json"])
+        run = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except Exception as exc:
         assert False, f"'in-network-rates-fee-for-service-sample-fhirized.json' raised an exception {exc}"
 
-# check if it validates successfully. 0 == success. 
-def test_in_network_rates():
-    schema_test_outcome = subprocess.call(["/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/validator", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/schemas/in-network-rates.json", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/data-files/in-network-rates-fee-for-service-sample-fhirized.json"])
-    assert schema_test_outcome == 0
+# check if it validates successfully. 0 == success.
+def test_in_network_rates_fee_for_service_fhirized():
+    cmd = ["../../validator", "../../schemas/in-network-rates.json", "../../data-files/in-network-rates-fee-for-service-sample-fhirized.json"]
+    run = subprocess.Popen(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    run.communicate()
+    assert run.returncode == 0

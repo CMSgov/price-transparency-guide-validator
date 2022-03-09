@@ -1,14 +1,17 @@
 # Test data-files/in-network-rates-fee-for-service-sample-fhirized.ndjson against its schema. 
 import subprocess
 
-# make sure this one throws an exception
-def test_schema_raises_no_exception():
+# check for exceptions on running the tool
+def test_in_network_rates_filetype_raises_no_exception():
+    cmd = ["../../validator", "../../schemas/in-network-rates.json", "../../data-files/in-network-rates-fee-for-service-sample-fhirized.ndjson"]
     try:
-        schema_test_outcome = subprocess.call(["/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/validator", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/schemas/in-network-rates.json", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/data-files/in-network-rates-fee-for-service-sample-fhirized.ndjson"])
+        run = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except Exception as exc:
-        assert True, f"'in-network-rates-fee-for-service-sample-fhirized.ndjson' raised an exception {exc}"
+        assert False, f"'in-network-rates-fee-for-service-sample-fhirized.ndjson' raised an exception {exc}"
 
-# make sure this one failed the validator. 1 == failure.
-def test_in_network_rates():
-    schema_test_outcome = subprocess.call(["/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/validator", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/schemas/in-network-rates.json", "/home/runner/work/price-transparency-guide-validator/price-transparency-guide-validator/data-files/in-network-rates-fee-for-service-sample-fhirized.ndjson"])
-    assert schema_test_outcome == 1
+# check if it validates successfully. 1 == failure.
+def test_in_network_rates_filetype():
+    cmd = ["../../validator", "../../schemas/in-network-rates.json", "../../data-files/in-network-rates-fee-for-service-sample-fhirized.ndjson"]
+    run = subprocess.Popen(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    run.communicate()
+    assert run.returncode == 1

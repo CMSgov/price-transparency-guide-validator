@@ -9,103 +9,62 @@ on:
       - main
 
 jobs:
-  compile_and_upload_validator_executable:
+  in_network_rates_schema_tests:
     runs-on: ubuntu-latest
-    
     steps:
       -
-        name: checkout repository to github runner
+        name: checkout repository
         uses: actions/checkout@v2
       -
         name: compile validator
-        run: g++ schemavalidator.cpp -o validator
-      -
-        name: upload the validator as github artifact to be referenced in other jobs
-        uses: actions/upload-artifact@v2
-        with:
-          name: validator
-          path: validator
-
-  in_network_rates_schema_test:
-    runs-on: ubuntu-latest
-
-    steps:
-      -
-        name: checkout repository
-        uses: actions/checkout@v2
-      -
-        uses: actions/download-artifact@v2
-        with:
-          name: validator
-          path: validator
-      -
-        name: validator permissions 
         run: |
-          chmod a+x validator
-          ls -la
-      -
-        name: install pytest
-        working-directory: ./tests
-        run: |
-          pip install -U pytest 
-      -
-        name: run in network tests
-        working-directory: ./tests/in network/
-        run: pytest -ra
-
-  allowed_amounts_schema_test:
-    runs-on: ubuntu-latest
-    needs: compile_and_upload_validator_executable
-    steps:
-      -
-        name: checkout repository
-        uses: actions/checkout@v2
-      -
-        uses: actions/download-artifact@v2
-        with:
-          name: validator
-          path: validator
-      -
-        name: validator permissions 
-        run: |
-          chmod a+x validator
-          ls -la
-      -
-        name: install pytest
-        working-directory: ./tests
-        run: |
-          pip install -U pytest        
-      -
-        name: run allowed amounts tests
-        working-directory: ./tests/allowed amounts/
-        run: |
-          cd tests/allowed\ amounts/
-          chmod a+rwx *
-          ls -la
-          pytest test_allowed_amounts_sample.py
-
-  prescription_drug_schema_tests:
-    runs-on: ubuntu-latest
-    needs: compile_and_upload_validator_executable
-    steps:
-      -
-        name: checkout repository
-        uses: actions/checkout@v2
-      -
-        uses: actions/download-artifact@v2
-        with:
-          name: validator
-          path: validator
-      -
-        name: validator permissions 
-        run: |
-          chmod a+x validator
-          ls -la
+          g++ schemavalidator.cpp -o validator
       -
         name: install pytest
         working-directory: ./tests
         run: pip install -U pytest
       -
+        name: run in network tests
+        working-directory: ./tests/in network/
+        run: pytest
+
+  allowed_amounts_schema_tests:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: checkout repository
+        uses: actions/checkout@v2
+      -
+        name: compile validator
+        run: |
+          g++ schemavalidator.cpp -o validator
+      -
+        name: install pytest
+        working-directory: ./tests
+        run: |
+          pip install -U pytest   
+      -
         name: run allowed amounts tests
-        working-directory: ./tests/prescription drugs/
-        run: pytest -ra
+        working-directory: ./tests/allowed amounts
+        run: |
+          pytest
+          
+  prescription_drug_schema_tests:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: checkout repository
+        uses: actions/checkout@v2
+      -
+        name: compile validator
+        run: |
+          g++ schemavalidator.cpp -o validator
+      -
+        name: install pytest
+        working-directory: ./tests
+        run: |
+          pip install -U pytest   
+      -
+        name: run allowed amounts tests
+        working-directory: ./tests/prescription drugs
+        run: pytest
