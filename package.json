@@ -4,7 +4,7 @@
   "description": "Node-based entry point for machine-readable file validator",
   "main": "out/index.js",
   "bin": {
-    "mr-validator": "out/index.js"
+    "cms-mrf-validator": "out/index.js"
   },
   "scripts": {
     "build": "del-cli out && tsc",

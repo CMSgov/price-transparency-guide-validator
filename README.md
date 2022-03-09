@@ -6,22 +6,31 @@ This tool is used to validate machine-readable files in JSON format against the 
 
 ### Prerequisites
 
-- Node
-- NPM
-- Git
-- Docker
+- Node (version 16.x)
+- NPM (version 8.5.x)
+- Git (latest version recommended, tested using 2.27.0)
+- Docker (version 19.x)
 
 ### Instructions
 
 Clone this repository using Git in the desired installation location:
 
-```
+```bash
 git clone https://github.com/CMSgov/price-transparency-guide-validator.git
 ```
 
+Make sure that Docker is running:
+
+```bash
+docker stats
+```
+
+If this shows a table of active containers and their resource usage, then Docker is active.
+
 From the directory containing the clone, build the validator Docker image:
 
-```
+```bash
+cd price-transparency-guide-validator
 docker build -t validator .
 ```
 

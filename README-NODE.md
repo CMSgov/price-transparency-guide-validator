@@ -20,13 +20,13 @@ Run the tool:
 
 ```bash
 # Help with command-line usage
-mr-validator --help
+cms-mrf-validator --help
 
 # Run with command-line output
-mr-validator path/to/schema.json path/to/data.json
+cms-mrf-validator path/to/schema.json path/to/data.json
 
 # Run with file output
-mr-validator path/to/schema.json path/to/data.json -o output-file.txt
+cms-mrf-validator path/to/schema.json path/to/data.json -o output-file.txt
 ```
 
 #### Development

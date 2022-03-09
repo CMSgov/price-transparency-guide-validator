@@ -14,7 +14,7 @@ main().catch(error => {
 
 async function main() {
   program
-    .name('mr-validator')
+    .name('cms-mrf-validator')
     .description('Tool for validating health coverage machine-readable files.')
     .command('validate')
     .description('Validate a file against a specific published version of a CMS schema.')
