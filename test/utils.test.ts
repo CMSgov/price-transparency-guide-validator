@@ -60,21 +60,21 @@ describe('utils', () => {
       ensureDirSync(path.join(repoDirectory, 'schemas', 'something-good'));
       oldRepoFolder = config.SCHEMA_REPO_FOLDER;
       config.SCHEMA_REPO_FOLDER = repoDirectory;
-      await execP(`git init ${repoDirectory}`);
-      await execP(`git -C ${repoDirectory} config user.name "test-user"`);
-      await execP(`git -C ${repoDirectory} config user.email "test-user@example.org"`);
+      await execP(`git init "${repoDirectory}"`);
+      await execP(`git -C "${repoDirectory}" config user.name "test-user"`);
+      await execP(`git -C "${repoDirectory}" config user.email "test-user@example.org"`);
       // create a few commits and tag them
       const schemaPath = path.join('schemas', 'something-good', 'something-good.json');
       writeFileSync(path.join(repoDirectory, schemaPath), 'first schema info');
-      await execP(`git -C ${repoDirectory} add -A`);
-      await execP(`git -C ${repoDirectory} commit -m "first commit"`);
-      await execP(`git -C ${repoDirectory} tag -a "v0.3" -m ""`);
+      await execP(`git -C "${repoDirectory}" add -A`);
+      await execP(`git -C "${repoDirectory}" commit -m "first commit"`);
+      await execP(`git -C "${repoDirectory}" tag -a "v0.3" -m ""`);
       writeFileSync(path.join(repoDirectory, schemaPath), 'schema for version 0.7');
-      await execP(`git -C ${repoDirectory} commit -am "second commit"`);
-      await execP(`git -C ${repoDirectory} tag -a "v0.7" -m ""`);
+      await execP(`git -C "${repoDirectory}" commit -am "second commit"`);
+      await execP(`git -C "${repoDirectory}" tag -a "v0.7" -m ""`);
       writeFileSync(path.join(repoDirectory, schemaPath), 'this is the first published schema');
-      await execP(`git -C ${repoDirectory} commit -am "third commit"`);
-      await execP(`git -C ${repoDirectory} tag -a "v1.0" -m ""`);
+      await execP(`git -C "${repoDirectory}" commit -am "third commit"`);
+      await execP(`git -C "${repoDirectory}" tag -a "v1.0" -m ""`);
     });
 
     afterAll(() => {

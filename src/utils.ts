@@ -25,13 +25,15 @@ export async function ensureRepo(repoDirectory: string) {
 export async function useRepoVersion(schemaVersion: string, schemaName: string) {
   try {
     await ensureRepo(config.SCHEMA_REPO_FOLDER);
-    const tagResult = await util.promisify(exec)(`git -C ${config.SCHEMA_REPO_FOLDER} tag --list`);
+    const tagResult = await util.promisify(exec)(
+      `git -C "${config.SCHEMA_REPO_FOLDER}" tag --list --sort=taggerdate`
+    );
     const tags = tagResult.stdout
       .split('\n')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
     if (tags.includes(schemaVersion)) {
-      await util.promisify(exec)(`git -C ${config.SCHEMA_REPO_FOLDER} checkout ${schemaVersion}`);
+      await util.promisify(exec)(`git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`);
       const schemaContents = fs.readFileSync(
         path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
       );

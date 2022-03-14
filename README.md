@@ -22,7 +22,7 @@ git clone https://github.com/CMSgov/price-transparency-guide-validator.git
 Make sure that Docker is running:
 
 ```bash
-docker stats
+docker ps
 ```
 
 If this shows a table of active containers and their resource usage, then Docker is active.
@@ -61,6 +61,16 @@ Commands:
   help [command]                                   display help for command
 ```
 
+### Update available schemas
+
+In order to perform validation, schemas must be available to the validator tool. The latest schemas can be obtained using the update command.
+
+From the installed directory:
+
+```
+node . update
+```
+
 ### Validate a file
 
 Validating a file against one of the provided schemas is the primary usage of this tool. Be sure that you have the latest schemas available by [running the update command](#update-available-schemas) first.
@@ -94,14 +104,4 @@ Options:
   -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference",
                          "table-of-contents", default: "in-network-rates")
   -h, --help             display help for command
-```
-
-### Update available schemas
-
-In order to perform validation, schemas must be available to the validator tool. The latest schemas can be obtained using the update command.
-
-From the installed directory:
-
-```
-node . update
 ```
