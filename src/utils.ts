@@ -30,7 +30,6 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
       .split('\n')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
-    console.log(tags);
     if (tags.includes(schemaVersion)) {
       await util.promisify(exec)(`git -C ${config.SCHEMA_REPO_FOLDER} checkout ${schemaVersion}`);
       const schemaContents = fs.readFileSync(
