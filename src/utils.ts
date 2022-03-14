@@ -1,7 +1,6 @@
 import util from 'util';
 import path from 'path';
 import { exec } from 'child_process';
-import NodeGit from 'nodegit';
 import fs from 'fs-extra';
 import temp from 'temp';
 
@@ -26,22 +25,22 @@ export async function ensureRepo(repoDirectory: string) {
 export async function useRepoVersion(schemaVersion: string, schemaName: string) {
   try {
     await ensureRepo(config.SCHEMA_REPO_FOLDER);
-    const repo = await NodeGit.Repository.open(config.SCHEMA_REPO_FOLDER);
-    const tags = await NodeGit.Tag.list(repo);
+    const tagResult = await util.promisify(exec)(`git -C ${config.SCHEMA_REPO_FOLDER} tag --list`);
+    const tags = tagResult.stdout
+      .split('\n')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+    console.log(tags);
     if (tags.includes(schemaVersion)) {
-      // if the specified version is a valid tag, get the schema file at that tag's commit
-      const versionTag = await repo.getTagByName(schemaVersion);
-      const versionTarget = await versionTag.target();
-      const versionCommit = await repo.getCommit(versionTarget.id());
-      const versionEntry = await versionCommit.getEntry(
-        path.join('schemas', schemaName, `${schemaName}.json`)
+      await util.promisify(exec)(`git -C ${config.SCHEMA_REPO_FOLDER} checkout ${schemaVersion}`);
+      const schemaContents = fs.readFileSync(
+        path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
       );
-      const blob = await versionEntry.getBlob();
       // write this version of the schema to a temporary file
       temp.track();
       const schemaDir = temp.mkdirSync('schemas');
       const schemaFilePath = path.join(schemaDir, 'schema.json');
-      fs.writeFileSync(schemaFilePath, blob.content(), { encoding: 'utf-8' });
+      fs.writeFileSync(schemaFilePath, schemaContents, { encoding: 'utf-8' });
       return schemaFilePath;
     } else {
       // we didn't find your tag. maybe you mistyped it, so show the available ones.

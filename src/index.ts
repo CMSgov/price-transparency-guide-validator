@@ -57,7 +57,9 @@ async function update() {
       );
       console.log('Retrieved schemas.');
     } else {
-      await util.promisify(exec)(`git -C "${config.SCHEMA_REPO_FOLDER}" pull --no-rebase -t`);
+      await util.promisify(exec)(
+        `git -C "${config.SCHEMA_REPO_FOLDER}" checkout master && git -C "${config.SCHEMA_REPO_FOLDER}" pull --no-rebase -t`
+      );
       console.log('Updated schemas.');
     }
   } catch (error) {
