@@ -149,6 +149,7 @@ Error report:
         "instanceRef": "#/out_of_network/0/allowed_amounts/0/service_code/3",
         "schemaRef": "#/definitions/allowed_amounts/properties/service_code/items"
     }
+}
 ```
 
 ### Performance Considerations
