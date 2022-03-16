@@ -106,6 +106,51 @@ Options:
   -h, --help             display help for command
 ```
 
+### Test file validation
+This project contains sample JSON files that can be used to familiarize yourself with the validation tool. These examples can be found in the `test-files` directory.
+
+Running the command from the root of the project:
+
+#### Running a valid file:
+```bash
+node . validate test-files/in-network-rates-fee-for-service-sample.json v1.0.0
+```
+Output: 
+```
+Input JSON is valid.
+```
+
+#### Running an invalid file:
+```bash
+node . validate test-files/allowed-amounts-error.json v1.0.0 -t allowed-amounts
+```
+Output: 
+```bash
+Input JSON is invalid.
+Error Name: type
+Message: Property has a type 'integer' that is not in the following list: 'string'.
+Instance: #/out_of_network/0/allowed_amounts/0/service_code/3
+Schema: #/definitions/allowed_amounts/properties/service_code/items
+
+
+Invalid schema: #/definitions/allowed_amounts/properties/service_code/items
+Invalid keyword: type
+Invalid code: 20
+Invalid message: Property has a type '%actual' that is not in the following list: '%expected'.
+Invalid document: #/out_of_network/0/allowed_amounts/0/service_code/3
+Error report:
+{
+    "type": {
+        "expected": [
+            "string"
+        ],
+        "actual": "integer",
+        "errorCode": 20,
+        "instanceRef": "#/out_of_network/0/allowed_amounts/0/service_code/3",
+        "schemaRef": "#/definitions/allowed_amounts/properties/service_code/items"
+    }
+```
+
 ### Performance Considerations
 This validation tool is based on [rapidjson](https://rapidjson.org/) which is a high performance C++ JSON parser. You can find various benchmarks on [rapidjson's site](https://rapidjson.org/md_doc_performance.html) that should give the user an idea on what to expect when using.
 
