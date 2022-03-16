@@ -2,41 +2,67 @@
 
 import util from 'util';
 import path from 'path';
-import { execFile } from 'child_process';
-import { program } from 'commander';
+import { exec } from 'child_process';
+import { program, OptionValues, Option } from 'commander';
+import fs from 'fs-extra';
 
-program
-  .name('mr-validator')
-  .usage('<schema-file> <data-file> [options]')
-  .argument('<schema-file>', 'path to schema file')
-  .argument('<data-file>', 'path to data file to validate')
-  .option('-o, --out <out>', 'output path')
-  .parse(process.argv);
+import { config, runContainer, useRepoVersion } from './utils';
 
-const options = program.opts();
-const validatorArgs = program.args;
-if (options.out) {
-  validatorArgs.push(options.out);
+main().catch(error => {
+  console.log(`Encountered an unexpected error: ${error}`);
+});
+
+async function main() {
+  program
+    .name('cms-mrf-validator')
+    .description('Tool for validating health coverage machine-readable files.')
+    .command('validate')
+    .description('Validate a file against a specific published version of a CMS schema.')
+    .usage('<data-file> <schema-version> [options]')
+    .argument('<data-file>', 'path to data file to validate')
+    .argument('<schema-version>', 'version of schema to use for validation')
+    .option('-o, --out <out>', 'output path')
+    .addOption(
+      new Option('-t, --target <schema>', 'name of schema to use')
+        .choices(config.AVAILABLE_SCHEMAS)
+        .default('in-network-rates')
+    )
+    .action(validate);
+
+  program
+    .command('update')
+    .description('Update the available schemas from the CMS repository.')
+    .action(update);
+
+  program.parseAsync(process.argv);
 }
 
-util
-  .promisify(execFile)(path.join(__dirname, '..', 'validator'), validatorArgs, {
-    cwd: path.join(__dirname, '..'),
-    shell: false
-  })
-  .then(result => {
-    console.log('validation success!');
-    if (!options.out) {
-      console.log(result.stdout);
-    }
-    console.log('thank you for using mr-validator!');
-  })
-  .catch(reason => {
-    console.log('validation failure. validation mesage follows:');
-    if (options.out) {
-      console.log('see output file for details.');
+async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
+  // get the schema that matches the chosen version and target name. then, use it to validate.
+  useRepoVersion(schemaVersion, options.target).then(schemaPath => {
+    if (schemaPath != null) {
+      runContainer(schemaPath, dataFile, options.out);
     } else {
-      console.log(reason.stdout);
-      console.log(reason.stderr);
+      console.log('No schema available - not validating.');
     }
   });
+}
+
+async function update() {
+  try {
+    // check if the repo exists. if not, clone it. if it exists, fetch updates.
+    if (!fs.existsSync(path.join(config.SCHEMA_REPO_FOLDER, '.git'))) {
+      await util.promisify(exec)(
+        `git clone ${config.SCHEMA_REPO_URL} "${config.SCHEMA_REPO_FOLDER}"`
+      );
+      console.log('Retrieved schemas.');
+    } else {
+      await util.promisify(exec)(
+        `git -C "${config.SCHEMA_REPO_FOLDER}" checkout master && git -C "${config.SCHEMA_REPO_FOLDER}" pull --no-rebase -t`
+      );
+      console.log('Updated schemas.');
+    }
+  } catch (error) {
+    console.log(`Error when updating available schemas: ${error}`);
+  }
+}
