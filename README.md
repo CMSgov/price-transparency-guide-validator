@@ -75,8 +75,6 @@ node . update
 
 Validating a file against one of the provided schemas is the primary usage of this tool. Be sure that you have the latest schemas available by [running the update command](#update-available-schemas) first.
 
-The exact amount of time needed for the validator to run will vary based on input file size and the machine running the validator. On a sample system with a 2.60GHz CPU and 16GB of memory, a typical processing rate is approximately 25 megabytes of input per second.
-
 From the installed directory:
 
 ```
@@ -107,3 +105,8 @@ Options:
                          "table-of-contents", default: "in-network-rates")
   -h, --help             display help for command
 ```
+
+### Performance Considerations
+This validation tool is based on [rapidjson](https://rapidjson.org/) which is a high performance C++ JSON parser. You can find various benchmarks on [rapidjson's site](https://rapidjson.org/md_doc_performance.html) that should give the user an idea on what to expect when using.
+
+The exact amount of time needed for the validator to run will vary based on input file size and the machine running the validator. On a sample system with a 2.60GHz CPU and 16GB of memory, a typical processing rate is approximately 25 megabytes of input per second.
