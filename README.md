@@ -107,7 +107,7 @@ Options:
 ```
 
 ### Test file validation
-This project contains sample JSON files that can be used to familiarize yourself with the validation tool. These examples can be found in the `test-files` directory.
+This project contains sample JSON files that can be used to familiarize yourself with the validation tool. These examples can be found in the [`test-files`](https://github.com/CMSgov/price-transparency-guide-validator/tree/documentation/test-files) directory.
 
 Running the command from the root of the project:
 
