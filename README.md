@@ -75,6 +75,8 @@ node . update
 
 Validating a file against one of the provided schemas is the primary usage of this tool. Be sure that you have the latest schemas available by [running the update command](#update-available-schemas) first.
 
+The exact amount of time needed for the validator to run will vary based on input file size and the machine running the validator. On a sample system with a 2.60GHz CPU and 16GB of memory, a typical processing rate is approximately 25 megabytes of input per second.
+
 From the installed directory:
 
 ```
