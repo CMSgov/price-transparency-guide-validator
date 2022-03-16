@@ -16,7 +16,7 @@
     "url": "git+https://github.com/CMSgov/price-transparency-guide-validator.git"
   },
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/CMSgov/price-transparency-guide-validator/issues"
   },
