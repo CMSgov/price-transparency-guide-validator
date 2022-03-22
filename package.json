@@ -6,6 +6,9 @@
   "bin": {
     "cms-mrf-validator": "out/index.js"
   },
+  "files": [
+    "out/**/*.js"
+  ],
   "scripts": {
     "build": "del-cli out && tsc",
     "prettier": "prettier --check \"src/*.ts\"",

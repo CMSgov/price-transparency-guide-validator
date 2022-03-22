@@ -34,19 +34,18 @@ cd price-transparency-guide-validator
 docker build -t validator .
 ```
 
-Install the dependencies for and build the Node script:
+Install the Node script with the `-g` global flag so it can be run from any location:
 
 ```
-npm install
-npm run build
+npm install -g cms-mrf-validator
 ```
 
 ## Usage
 
-The validator is run from the cloned directory. For basic usage instructions:
+The validator can be run from any directory. For basic usage instructions:
 
 ```
-node . help
+cms-mrf-validator help
 ```
 
 ```
@@ -68,7 +67,7 @@ In order to perform validation, schemas must be available to the validator tool.
 From the installed directory:
 
 ```
-node . update
+cms-mrf-validator update
 ```
 
 ### Validate a file
@@ -78,16 +77,16 @@ Validating a file against one of the provided schemas is the primary usage of th
 From the installed directory:
 
 ```
-node . validate <data-file> <schema-version> [-o out] [-t target]
+cms-mrf-validator validate <data-file> <schema-version> [-o out] [-t target]
 ```
 
 Example usages:
 
 ```bash
 # basic usage, printing output directly and using the default in-network-rates schema
-node . validate my-data.json v1.0.0
+cms-mrf-validator validate my-data.json v1.0.0
 # output will be written to a file. validate using allowed-amounts schema
-node . validate my-data.json v1.0.0 -o results.txt -t allowed-amounts
+cms-mrf-validator validate my-data.json v1.0.0 -o results.txt -t allowed-amounts
 ```
 
 Further details:
@@ -107,24 +106,31 @@ Options:
 ```
 
 ### Test file validation
+
 This project contains sample JSON files that can be used to familiarize yourself with the validation tool. These examples can be found in the [`test-files`](https://github.com/CMSgov/price-transparency-guide-validator/tree/documentation/test-files) directory.
 
 Running the command from the root of the project:
 
 #### Running a valid file:
+
 ```bash
-node . validate test-files/in-network-rates-fee-for-service-sample.json v1.0.0
+cms-mrf-validator validate test-files/in-network-rates-fee-for-service-sample.json v1.0.0
 ```
-Output: 
+
+Output:
+
 ```
 Input JSON is valid.
 ```
 
 #### Running an invalid file:
+
 ```bash
-node . validate test-files/allowed-amounts-error.json v1.0.0 -t allowed-amounts
+cms-mrf-validator validate test-files/allowed-amounts-error.json v1.0.0 -t allowed-amounts
 ```
-Output: 
+
+Output:
+
 ```bash
 Input JSON is invalid.
 Error Name: type
@@ -153,6 +159,7 @@ Error report:
 ```
 
 ### Performance Considerations
+
 This validation tool is based on [rapidjson](https://rapidjson.org/) which is a high performance C++ JSON parser. You can find various benchmarks on [rapidjson's site](https://rapidjson.org/md_doc_performance.html) that should give the user an idea on what to expect when using.
 
 The exact amount of time needed for the validator to run will vary based on input file size and the machine running the validator. On a sample system with a 2.60GHz CPU and 16GB of memory, a typical processing rate is approximately 25 megabytes of input per second.
