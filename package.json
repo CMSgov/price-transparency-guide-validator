@@ -1,5 +1,5 @@
 {
-  "name": "price-transparency-guide-validator",
+  "name": "cms-mrf-validator",
   "version": "1.0.0",
   "description": "Node-based entry point for machine-readable file validator",
   "main": "out/index.js",
