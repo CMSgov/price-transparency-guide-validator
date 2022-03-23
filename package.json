@@ -1,6 +1,6 @@
 {
   "name": "price-transparency-guide-validator",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Node-based entry point for machine-readable file validator",
   "main": "out/index.js",
   "bin": {
