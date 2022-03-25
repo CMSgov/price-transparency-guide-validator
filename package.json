@@ -1,11 +1,14 @@
 {
-  "name": "price-transparency-guide-validator",
-  "version": "0.1.0",
+  "name": "cms-mrf-validator",
+  "version": "1.0.0",
   "description": "Node-based entry point for machine-readable file validator",
   "main": "out/index.js",
   "bin": {
     "cms-mrf-validator": "out/index.js"
   },
+  "files": [
+    "out/**/*.js"
+  ],
   "scripts": {
     "build": "del-cli out && tsc",
     "prettier": "prettier --check \"src/*.ts\"",
