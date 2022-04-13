@@ -230,6 +230,7 @@ int main(int argc, char *argv[]) {
         fprintf(errFile, "Error(offset %u): %s\n",
             static_cast<unsigned>(reader.GetErrorOffset()),
             GetParseError_En(reader.GetParseErrorCode()));
+        return EXIT_FAILURE;
     }
 
     // Check the validation result
