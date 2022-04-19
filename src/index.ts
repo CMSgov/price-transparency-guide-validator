@@ -38,6 +38,11 @@ async function main() {
 }
 
 async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
+    // check to see if supplied json file exists
+    if (!fs.existsSync(dataFile)) {
+      console.log(`Could not find data file: ${dataFile}`);
+      return;
+    }
   // get the schema that matches the chosen version and target name. then, use it to validate.
   useRepoVersion(schemaVersion, options.target).then(schemaPath => {
     if (schemaPath != null) {
