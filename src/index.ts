@@ -3,10 +3,10 @@
 import util from 'util';
 import path from 'path';
 import { exec } from 'child_process';
-import { program, OptionValues, Option } from 'commander';
+import { program, Option } from 'commander';
 import fs from 'fs-extra';
 
-import { config, runContainer, useRepoVersion } from './utils';
+import { config, validate } from './utils';
 
 main().catch(error => {
   console.log(`Encountered an unexpected error: ${error}`);
@@ -35,22 +35,6 @@ async function main() {
     .action(update);
 
   program.parseAsync(process.argv);
-}
-
-async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
-    // check to see if supplied json file exists
-    if (!fs.existsSync(dataFile)) {
-      console.log(`Could not find data file: ${dataFile}`);
-      return;
-    }
-  // get the schema that matches the chosen version and target name. then, use it to validate.
-  useRepoVersion(schemaVersion, options.target).then(schemaPath => {
-    if (schemaPath != null) {
-      runContainer(schemaPath, dataFile, options.out);
-    } else {
-      console.log('No schema available - not validating.');
-    }
-  });
 }
 
 async function update() {

@@ -4,7 +4,7 @@ import temp from 'temp';
 import util from 'util';
 import { exec } from 'child_process';
 
-import { buildRunCommand, config, useRepoVersion } from '../src/utils';
+import * as validatorUtils from '../src/utils';
 import { ensureDirSync, readFileSync, writeFileSync } from 'fs-extra';
 
 const SEP = path.sep;
@@ -14,7 +14,7 @@ const execP = util.promisify(exec);
 describe('utils', () => {
   describe('#buildRunCommand', () => {
     it('should build the command to run the validation container without an output path', () => {
-      const result = buildRunCommand(
+      const result = validatorUtils.buildRunCommand(
         SEP + path.join('some', 'useful', 'schema.json'), // this is an absolute path
         path.join('my', 'data.json'), // this is a relative path
         '',
@@ -34,7 +34,7 @@ describe('utils', () => {
     });
 
     it('should build the command to run the validation container with an output path', () => {
-      const result = buildRunCommand(
+      const result = validatorUtils.buildRunCommand(
         path.join('some', 'useful', 'schema.json'), // this is a relative path
         SEP + path.join('other', 'data', 'data.json'), // this is an absolute path
         path.join('results', 'output.txt'), // this is a relative path
@@ -58,8 +58,8 @@ describe('utils', () => {
       // set up our test repo
       const repoDirectory = temp.mkdirSync();
       ensureDirSync(path.join(repoDirectory, 'schemas', 'something-good'));
-      oldRepoFolder = config.SCHEMA_REPO_FOLDER;
-      config.SCHEMA_REPO_FOLDER = repoDirectory;
+      oldRepoFolder = validatorUtils.config.SCHEMA_REPO_FOLDER;
+      validatorUtils.config.SCHEMA_REPO_FOLDER = repoDirectory;
       await execP(`git init "${repoDirectory}"`);
       await execP(`git -C "${repoDirectory}" config user.name "test-user"`);
       await execP(`git -C "${repoDirectory}" config user.email "test-user@example.org"`);
@@ -78,25 +78,51 @@ describe('utils', () => {
     });
 
     afterAll(() => {
-      config.SCHEMA_REPO_FOLDER = oldRepoFolder;
+      validatorUtils.config.SCHEMA_REPO_FOLDER = oldRepoFolder;
       temp.cleanupSync();
     });
 
     it('should return a file path to the schema contents at the specified version', async () => {
-      const result = await useRepoVersion('v0.7', 'something-good');
+      const result = await validatorUtils.useRepoVersion('v0.7', 'something-good');
       expect(result).toBeDefined();
       const contents = readFileSync(<string>result, { encoding: 'utf-8' });
       expect(contents).toBe('schema for version 0.7');
     });
 
     it('should return undefined when the given tag is not available', async () => {
-      const result = await useRepoVersion('v0.6', 'something-good');
+      const result = await validatorUtils.useRepoVersion('v0.6', 'something-good');
       expect(result).toBeUndefined();
     });
 
     it('should return undefined when the given schema is not available', async () => {
-      const result = await useRepoVersion('v0.3', 'something-bad');
+      const result = await validatorUtils.useRepoVersion('v0.3', 'something-bad');
       expect(result).toBeUndefined();
     });
   });
+
+  describe('#validate', () => {
+    let useRepoSpy: jest.SpyInstance;
+    beforeAll(() => {
+        useRepoSpy = jest.spyOn(validatorUtils, 'useRepoVersion');
+        useRepoSpy.mockReturnValue(null)
+    });
+
+    beforeEach(() => {
+        useRepoSpy.mockClear();
+    });
+
+    it('should continue processing when the data file exists', async () =>{
+        await validatorUtils.validate(path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'), 'schema version 278', {target: null});
+        expect(useRepoSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not continue processing when the data file does not exist', async () => {
+        await validatorUtils.validate(path.join(__dirname, '..', 'test-files', 'not-real.json'), 'schema version 8', {target: null});
+        expect(useRepoSpy).toHaveBeenCalledTimes(0);
+    });
+
+    afterAll(() => {
+        useRepoSpy.mockRestore();
+    })
+})
 });
