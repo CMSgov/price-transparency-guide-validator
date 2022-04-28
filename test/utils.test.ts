@@ -99,30 +99,4 @@ describe('utils', () => {
       expect(result).toBeUndefined();
     });
   });
-
-  describe('#validate', () => {
-    let useRepoSpy: jest.SpyInstance;
-    beforeAll(() => {
-        useRepoSpy = jest.spyOn(validatorUtils, 'useRepoVersion');
-        useRepoSpy.mockReturnValue(null)
-    });
-
-    beforeEach(() => {
-        useRepoSpy.mockClear();
-    });
-
-    it('should continue processing when the data file exists', async () =>{
-        await validatorUtils.validate(path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'), 'schema version 278', {target: null});
-        expect(useRepoSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not continue processing when the data file does not exist', async () => {
-        await validatorUtils.validate(path.join(__dirname, '..', 'test-files', 'not-real.json'), 'schema version 8', {target: null});
-        expect(useRepoSpy).toHaveBeenCalledTimes(0);
-    });
-
-    afterAll(() => {
-        useRepoSpy.mockRestore();
-    })
-})
 });

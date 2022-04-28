@@ -3,7 +3,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
 import temp from 'temp';
-import { OptionValues } from 'commander';
+// import { OptionValues } from 'commander';
 
 export const config = {
   AVAILABLE_SCHEMAS: [
@@ -15,22 +15,6 @@ export const config = {
   SCHEMA_REPO_URL: 'https://github.com/CMSgov/price-transparency-guide.git',
   SCHEMA_REPO_FOLDER: path.normalize(path.join(__dirname, '..', 'schema-repo'))
 };
-
-export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
-  // check to see if supplied json file exists
-  if (!fs.existsSync(dataFile)) {
-    console.log(`Could not find data file: ${dataFile}`);
-    return;
-  }
-  // get the schema that matches the chosen version and target name. then, use it to validate.
-  useRepoVersion(schemaVersion, options.target).then(schemaPath => {
-    if (schemaPath != null) {
-      runContainer(schemaPath, dataFile, options.out);
-    } else {
-      console.log('No schema available - not validating.');
-    }
-  });
-}
 
 export async function ensureRepo(repoDirectory: string) {
   // check if the repo exists, and if not, try to clone it
@@ -50,7 +34,9 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
     if (tags.includes(schemaVersion)) {
-      await validatorUtils.promisify(exec)(`git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`);
+      await validatorUtils.promisify(exec)(
+        `git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`
+      );
       const schemaContents = fs.readFileSync(
         path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
       );
