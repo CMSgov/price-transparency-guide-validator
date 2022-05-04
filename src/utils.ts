@@ -1,4 +1,4 @@
-import util from 'util';
+import validatorUtils from 'util';
 import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
@@ -18,14 +18,14 @@ export const config = {
 export async function ensureRepo(repoDirectory: string) {
   // check if the repo exists, and if not, try to clone it
   if (!fs.existsSync(path.join(repoDirectory, '.git'))) {
-    return util.promisify(exec)(`git clone ${config.SCHEMA_REPO_URL} "${repoDirectory}"`);
+    return validatorUtils.promisify(exec)(`git clone ${config.SCHEMA_REPO_URL} "${repoDirectory}"`);
   }
 }
 
 export async function useRepoVersion(schemaVersion: string, schemaName: string) {
   try {
     await ensureRepo(config.SCHEMA_REPO_FOLDER);
-    const tagResult = await util.promisify(exec)(
+    const tagResult = await validatorUtils.promisify(exec)(
       `git -C "${config.SCHEMA_REPO_FOLDER}" tag --list --sort=taggerdate`
     );
     const tags = tagResult.stdout
@@ -33,7 +33,9 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
     if (tags.includes(schemaVersion)) {
-      await util.promisify(exec)(`git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`);
+      await validatorUtils.promisify(exec)(
+        `git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`
+      );
       const schemaContents = fs.readFileSync(
         path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
       );
@@ -86,7 +88,7 @@ export function buildRunCommand(
 
 export async function runContainer(schemaPath: string, dataPath: string, outputPath: string) {
   try {
-    const containerId = await util
+    const containerId = await validatorUtils
       .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
       .then(result => result.stdout.trim())
       .catch(reason => {
@@ -95,7 +97,7 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
       });
     if (containerId.length > 0) {
       const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, containerId);
-      return util
+      return validatorUtils
         .promisify(exec)(runCommand)
         .then(result => {
           console.log(result.stdout);
