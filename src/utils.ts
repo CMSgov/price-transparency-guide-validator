@@ -3,7 +3,6 @@ import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
 import temp from 'temp';
-// import { OptionValues } from 'commander';
 
 export const config = {
   AVAILABLE_SCHEMAS: [
