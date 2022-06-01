@@ -15,15 +15,49 @@ describe('commands', () => {
 
     beforeEach(() => {
       useRepoSpy.mockClear();
+      runContainerSpy.mockClear();
     });
 
-    it('should continue processing when the data file exists', async () => {
+    it('should continue processing when the json data file exists', async () => {
+      const options = { target: null };
       await validate(
         path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'),
         'schema version 278',
-        { target: null }
+        options
       );
       expect(useRepoSpy).toHaveBeenCalledTimes(1);
+      expect(useRepoSpy).toHaveBeenLastCalledWith('schema version 278', null, 'json');
+    });
+
+    it('should continue processing when the xml data file exists', async () => {
+      const options = { target: null };
+      await validate(
+        path.join(__dirname, '..', 'test-files', 'in-network-rates.xml'),
+        'schema version 378',
+        options
+      );
+      expect(useRepoSpy).toHaveBeenCalledTimes(1);
+      expect(useRepoSpy).toHaveBeenLastCalledWith('schema version 378', null, 'xsd');
+    });
+
+    it('should not continue processing when the file exists, but has an unrecognized extension', async () => {
+      await validate(
+        path.join(__dirname, '..', 'test-files', 'some-other-file.txt'),
+        'schema version 8',
+        { target: null }
+      );
+      expect(useRepoSpy).toHaveBeenCalledTimes(0);
+    });
+
+    it('should continue processing when the file exists and a specific datatype is provided', async () => {
+      const options = { target: null, format: 'xml' };
+      await validate(
+        path.join(__dirname, '..', 'test-files', 'some-other-file.txt'),
+        'schema version 432',
+        options
+      );
+      expect(useRepoSpy).toHaveBeenCalledTimes(1);
+      expect(useRepoSpy).toHaveBeenLastCalledWith('schema version 432', null, 'xsd');
     });
 
     it('should not continue processing when the data file does not exist', async () => {
@@ -36,13 +70,12 @@ describe('commands', () => {
     });
 
     it('should run the container when the requested schema is available', async () => {
+      const options = { target: null };
+      const dataPath = path.join(__dirname, '..', 'test-files', 'allowed-amounts.json');
       useRepoSpy.mockResolvedValueOnce('good.json');
-      await validate(
-        path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'),
-        'schema version 278',
-        { target: null }
-      );
+      await validate(dataPath, 'schema version 278', options);
       expect(runContainerSpy).toHaveBeenCalledTimes(1);
+      expect(runContainerSpy).toHaveBeenLastCalledWith('good.json', dataPath, undefined, 'json');
     });
 
     it('should not run the container when the requested schema is not available', async () => {
@@ -51,7 +84,7 @@ describe('commands', () => {
         'schema version 278',
         { target: null }
       );
-      expect(runContainerSpy).toHaveBeenCalledTimes(1);
+      expect(runContainerSpy).toHaveBeenCalledTimes(0);
     });
 
     afterAll(() => {

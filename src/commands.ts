@@ -6,15 +6,26 @@ import { OptionValues } from 'commander';
 import { config, runContainer, useRepoVersion } from './utils';
 
 export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
-  // check to see if supplied json file exists
+  // check to see if supplied data file exists
   if (!fs.existsSync(dataFile)) {
     console.log(`Could not find data file: ${dataFile}`);
     return;
   }
+
+  const datatype = options.format ?? path.extname(dataFile).substring(1);
+  let schemaExtension: string;
+  if (datatype === 'xml') {
+    schemaExtension = 'xsd';
+  } else if (datatype === 'json') {
+    schemaExtension = 'json';
+  } else {
+    console.log('Unrecognized file extension for data file - not validating');
+    return;
+  }
   // get the schema that matches the chosen version and target name. then, use it to validate.
-  useRepoVersion(schemaVersion, options.target).then(schemaPath => {
+  await useRepoVersion(schemaVersion, options.target, schemaExtension).then(async schemaPath => {
     if (schemaPath != null) {
-      runContainer(schemaPath, dataFile, options.out);
+      await runContainer(schemaPath, dataFile, options.out, datatype);
     } else {
       console.log('No schema available - not validating.');
     }

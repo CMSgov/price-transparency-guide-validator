@@ -18,6 +18,7 @@ describe('utils', () => {
         SEP + path.join('some', 'useful', 'schema.json'), // this is an absolute path
         path.join('my', 'data.json'), // this is a relative path
         '',
+        'json',
         'bad1dea'
       );
       // since the container is running linux, it should always use / as its path separator.
@@ -29,15 +30,16 @@ describe('utils', () => {
       )}":/schema/ -v "${path.join(
         PROJECT_DIR,
         'my'
-      )}":/data/ bad1dea "schema/schema.json" "data/data.json"`;
+      )}":/data/ bad1dea json "schema/schema.json" "data/data.json"`;
       expect(result).toBe(expectedCommand);
     });
 
     it('should build the command to run the validation container with an output path', () => {
       const result = validatorUtils.buildRunCommand(
-        path.join('some', 'useful', 'schema.json'), // this is a relative path
-        SEP + path.join('other', 'data', 'data.json'), // this is an absolute path
+        path.join('some', 'useful', 'schema.xml'), // this is a relative path
+        SEP + path.join('other', 'data', 'data.xml'), // this is an absolute path
         path.join('results', 'output.txt'), // this is a relative path
+        'xml',
         'dadb0d'
       );
       const expectedCommand = `docker run -v "${path.join(
@@ -47,7 +49,7 @@ describe('utils', () => {
       )}":/schema/ -v "${path.join(path.resolve(SEP), 'other', 'data')}":/data/ -v "${path.join(
         PROJECT_DIR,
         'results'
-      )}":/output/ dadb0d "schema/schema.json" "data/data.json" -o "output/output.txt"`;
+      )}":/output/ dadb0d xml "schema/schema.xml" "data/data.xml" "output/output.txt"`;
       expect(result).toBe(expectedCommand);
     });
   });
@@ -83,19 +85,19 @@ describe('utils', () => {
     });
 
     it('should return a file path to the schema contents at the specified version', async () => {
-      const result = await validatorUtils.useRepoVersion('v0.7', 'something-good');
+      const result = await validatorUtils.useRepoVersion('v0.7', 'something-good', 'json');
       expect(result).toBeDefined();
       const contents = readFileSync(<string>result, { encoding: 'utf-8' });
       expect(contents).toBe('schema for version 0.7');
     });
 
     it('should return undefined when the given tag is not available', async () => {
-      const result = await validatorUtils.useRepoVersion('v0.6', 'something-good');
+      const result = await validatorUtils.useRepoVersion('v0.6', 'something-good', 'json');
       expect(result).toBeUndefined();
     });
 
     it('should return undefined when the given schema is not available', async () => {
-      const result = await validatorUtils.useRepoVersion('v0.3', 'something-bad');
+      const result = await validatorUtils.useRepoVersion('v0.3', 'something-bad', 'json');
       expect(result).toBeUndefined();
     });
   });

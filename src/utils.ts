@@ -22,7 +22,7 @@ export async function ensureRepo(repoDirectory: string) {
   }
 }
 
-export async function useRepoVersion(schemaVersion: string, schemaName: string) {
+export async function useRepoVersion(schemaVersion: string, schemaName: string, extension: string) {
   try {
     await ensureRepo(config.SCHEMA_REPO_FOLDER);
     const tagResult = await validatorUtils.promisify(exec)(
@@ -36,15 +36,18 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
       await validatorUtils.promisify(exec)(
         `git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`
       );
-      const schemaContents = fs.readFileSync(
-        path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
+      const schemaSource = path.join(
+        config.SCHEMA_REPO_FOLDER,
+        'schemas',
+        schemaName,
+        `${schemaName}.${extension}`
       );
-      // write this version of the schema to a temporary file
+      // copy this version of the schema to a temporary file
       temp.track();
       const schemaDir = temp.mkdirSync('schemas');
-      const schemaFilePath = path.join(schemaDir, 'schema.json');
-      fs.writeFileSync(schemaFilePath, schemaContents, { encoding: 'utf-8' });
-      return schemaFilePath;
+      const schemaDestination = path.join(schemaDir, `schema.${extension}`);
+      fs.copySync(schemaSource, schemaDestination);
+      return schemaDestination;
     } else {
       // we didn't find your tag. maybe you mistyped it, so show the available ones.
       console.log(
@@ -62,6 +65,7 @@ export function buildRunCommand(
   schemaPath: string,
   dataPath: string,
   outputPath: string,
+  datatype: string,
   containerId: string
 ): string {
   // figure out mount for schema file
@@ -80,13 +84,20 @@ export function buildRunCommand(
     outputFile = path.basename(absoluteOutputPath);
   }
   if (outputDir && outputFile) {
-    return `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${outputDir}":/output/ ${containerId} "schema/${schemaFile}" "data/${dataFile}" -o "output/${outputFile}"`;
+    return `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${outputDir}":/output/ ${containerId} ${datatype} "schema/${schemaFile}" "data/${dataFile}" ${
+      datatype === 'json' ? '-o ' : ''
+    }"output/${outputFile}"`;
   } else {
-    return `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${containerId} "schema/${schemaFile}" "data/${dataFile}"`;
+    return `docker run -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${containerId} ${datatype} "schema/${schemaFile}" "data/${dataFile}"`;
   }
 }
 
-export async function runContainer(schemaPath: string, dataPath: string, outputPath: string) {
+export async function runContainer(
+  schemaPath: string,
+  dataPath: string,
+  outputPath: string,
+  datatype: string
+) {
   try {
     const containerId = await validatorUtils
       .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
@@ -96,7 +107,7 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
         return '';
       });
     if (containerId.length > 0) {
-      const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, containerId);
+      const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, datatype, containerId);
       return validatorUtils
         .promisify(exec)(runCommand)
         .then(result => {

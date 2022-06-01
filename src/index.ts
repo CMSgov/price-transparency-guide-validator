@@ -23,6 +23,12 @@ async function main() {
         .choices(config.AVAILABLE_SCHEMAS)
         .default('in-network-rates')
     )
+    .addOption(
+      new Option(
+        '-f, --format <format>',
+        'use specified format instead of detecting from file extension'
+      ).choices(['json', 'xml'])
+    )
     .action(validate);
 
   program
