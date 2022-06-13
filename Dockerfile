@@ -14,7 +14,8 @@ COPY ./rapidjson /rapidjson
 COPY ./tclap /tclap
 RUN g++ -I /tclap/include/ schemavalidator.cpp -o validator
 COPY ./CmsMrfValidator.java /
-RUN javac CmsMrfValidator.java
+COPY ./lib /lib
+RUN javac -cp "lib/*" CmsMrfValidator.java
 COPY ./entry.sh /
 
 ENTRYPOINT ["/entry.sh"]

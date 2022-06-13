@@ -4,7 +4,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.sax.SAXSource;
 import javax.xml.validation.*;
@@ -30,7 +29,7 @@ public class CmsMrfValidator {
     } else {
       outputWriter = new PrintWriter(System.out);
     }
-    SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+    SchemaFactory factory = SchemaFactory.newInstance("http://www.w3.org/XML/XMLSchema/v1.1");
     Schema cookieSchema = null;
     try {
       cookieSchema = factory.newSchema(new File(args[0]));
