@@ -52,9 +52,11 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
           '\n'
         )}`
       );
+      process.exitCode = 1;
     }
   } catch (error) {
     console.log(`Error when accessing schema: ${error}`);
+    process.exitCode = 1;
   }
 }
 
@@ -105,11 +107,14 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
         .catch(reason => {
           console.log(reason.stdout);
           console.log(reason.stderr);
+          process.exitCode = 1;
         });
     } else {
       console.log('Could not find a validator docker container.');
+      process.exitCode = 1;
     }
   } catch (error) {
     console.log(`Error when running validator container: ${error}`);
+    process.exitCode = 1;
   }
 }
