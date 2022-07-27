@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!-- edit xmlns, xmlns:xsd property to reference this file on your local system -->
+<xsd:schema xmlns="file:/path/to/in-network-rates.xsd"
+    xmlns:xsd="file:/path/to/in-network-rates.xsd"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    vc:minVersion="1.1">
+
+    <xsd:element name="root">
+        <!-- actual file definition -->
+        <xsd:complexType>
+            <xsd:all>
+                <xsd:element name="reporting_entity_name" type="xsd:string"/>
+                <xsd:element name="reporting_entity_type" type="xsd:string"/>
+                <xsd:element name="plan_name" type="xsd:string" minOccurs="0"/>
+                <xsd:element name="plan_id_type" minOccurs="0">
+                    <xsd:simpleType>
+                        <xsd:restriction base="xsd:string">
+                            <xsd:enumeration value="EIN"/>
+                            <xsd:enumeration value="HIOS"/>
+                        </xsd:restriction>
+                    </xsd:simpleType>
+                </xsd:element>
+                <xsd:element name="plan_id" type="xsd:string" minOccurs="0"/>
+                <xsd:element name="plan_market_type" minOccurs="0">
+                    <xsd:simpleType>
+                        <xsd:restriction base="xsd:string">
+                            <xsd:enumeration value="group"/>
+                            <xsd:enumeration value="individual"/>
+                        </xsd:restriction>
+                    </xsd:simpleType>
+                </xsd:element>
+                <xsd:element name="in_network">
+                    <xsd:complexType>
+                        <xsd:sequence>
+                            <!-- note that the array and its items have the same name, not final array structure.--> 
+                            <xsd:element name="in_network" type="in_network_object" maxOccurs="unbounded"/>
+                        </xsd:sequence>
+                    </xsd:complexType>
+                </xsd:element>
+                <xsd:element name="provider_references" minOccurs="0">
+                    <xsd:complexType>
+                        <xsd:sequence>
+                            <xsd:group ref="provider_reference_group"/>
+                        </xsd:sequence>
+                    </xsd:complexType>
+                </xsd:element>
+                <xsd:element name="last_updated_on" type="xsd:date"/>
+                <xsd:element name="version" type="xsd:string" minOccurs="0"/>
+            </xsd:all>
+            <xsd:assert test="count(plan_name) eq count(plan_id_type) and count(plan_name) eq count(plan_id) and count(plan_name) eq count(plan_market_type)"/>
+        </xsd:complexType>
+    </xsd:element>
+
+    <!-- In-network object definition -->
+    <xsd:complexType name="in_network_object">
+        <xsd:all>
+            <xsd:element name="negotiation_arrangement">
+                <xsd:simpleType>
+                    <xsd:restriction base="xsd:string">
+                        <xsd:enumeration value="ffs"/>
+                        <xsd:enumeration value="bundle"/>
+                        <xsd:enumeration value="capitation"/>
+                        <xsd:enumeration value="percentage"/>
+                        <xsd:enumeration value="per diem"/>
+                    </xsd:restriction>
+                </xsd:simpleType>
+            </xsd:element>
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="billing_code_type">
+                <xsd:simpleType>
+                    <xsd:restriction base="xsd:string">
+                        <xsd:enumeration value="CPT"/>
+                        <xsd:enumeration value="HCPCS"/>
+                        <xsd:enumeration value="ICD"/>
+                        <xsd:enumeration value="MS-DRG"/>
+                        <xsd:enumeration value="R-DRG"/>
+                        <xsd:enumeration value="S-DRG"/>
+                        <xsd:enumeration value="APS-DRG"/>
+                        <xsd:enumeration value="AP-DRG"/>
+                        <xsd:enumeration value="APR-DRG"/>
+                        <xsd:enumeration value="APC"/>
+                        <xsd:enumeration value="NDC"/>
+                        <xsd:enumeration value="HIPPS"/>
+                        <xsd:enumeration value="LOCAL"/>
+                        <xsd:enumeration value="EAPG"/>
+                        <xsd:enumeration value="CDT"/>
+                        <xsd:enumeration value="RC"/>
+                        <xsd:enumeration value="CSTM-ALL"/>
+                    </xsd:restriction>
+                </xsd:simpleType>
+            </xsd:element>
+            <xsd:element name="billing_code_type_version" type="xsd:string"/>
+            <xsd:element name="billing_code" type="xsd:string"/>
+            <xsd:element name="description" type="xsd:string"/>
+            <!-- referenced type; negotiated_rate_details -->
+            <xsd:element name="negotiated_rates">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:group ref="negotiated_rate_details_group" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <!-- referenced type; bundle_code -->
+            <xsd:element name="bundled_codes" minOccurs="0">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:group ref="bundle_code_element_group"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <!-- referenced type; covered_services -->
+            <xsd:element name="covered_services" minOccurs="0">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:group ref="covered_services_element_group"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:complexType>
+
+    <!-- Provider_Reference object definition -->
+    <xsd:group name="provider_reference_group">
+        <xsd:sequence>
+            <xsd:element name="provider_reference" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:group ref="provider-reference-group-id_element_group"/>
+                        <xsd:choice>
+                            <xsd:element name="provider_groups">
+                                <xsd:complexType>
+                                    <xsd:all>
+                                        <!-- referenced type; providers object -->
+                                        <xsd:group ref="providers_element_group"/>
+                                    </xsd:all>
+                                </xsd:complexType>
+                            </xsd:element>
+                            <xsd:element name="location" type="xsd:string"/>
+                        </xsd:choice>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+
+    <xsd:group name="providers_element_group">
+        <xsd:all>
+            <xsd:element name="providers" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:all>
+                        <xsd:element name="npi">
+                            <xsd:complexType>
+                                <xsd:all>
+                                    <xsd:element name="item" type="xsd:integer"
+                                        maxOccurs="unbounded"/>
+                                </xsd:all>
+                            </xsd:complexType>
+                            <xsd:unique name="unique_npi_item">
+                                <xsd:selector xpath="npi/item"/>
+                                <xsd:field xpath="tbd"/>
+                            </xsd:unique>
+                        </xsd:element>
+                        <xsd:element name="tin">
+                            <xsd:complexType>
+                                <xsd:all>
+                                    <xsd:element name="type">
+                                        <xsd:simpleType>
+                                            <xsd:restriction base="xsd:string">
+                                                <xsd:enumeration value="ein"/>
+                                                <xsd:enumeration value="npi"/>
+                                            </xsd:restriction>
+                                        </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element name="value" type="xsd:string"/>
+                                </xsd:all>
+                            </xsd:complexType>
+                        </xsd:element>
+                    </xsd:all>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:group>
+
+    <!-- children of in-network complexType -->
+    <xsd:group name="negotiated_rate_details_group">
+        <xsd:sequence>
+            <xsd:element name="negotiated_rate_details" maxOccurs="unbounded">
+                <!-- This one describes the objects in the negotiated rates array -->
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:group ref="negotiated_price_group"/>
+                        <xsd:choice>
+                            <xsd:element name="provider_groups">
+                                <xsd:complexType>
+                                    <xsd:all>
+                                        <xsd:group ref="providers_element_group"/>
+                                    </xsd:all>
+                                </xsd:complexType>
+                                <xsd:unique name="unique_provider_objects">
+                                    <xsd:selector xpath="provider_groups/providers/tin/value"/>
+                                    <xsd:field xpath="tbd"/>
+                                </xsd:unique>
+                            </xsd:element>
+                            <xsd:element name="provider_references" maxOccurs="unbounded">
+                                <xsd:complexType>
+                                    <xsd:sequence>
+                                        <xsd:group ref="provider-reference-group-id_element_group"/>
+                                    </xsd:sequence>
+                                </xsd:complexType>
+                            </xsd:element>
+                        </xsd:choice>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+
+    <xsd:group name="bundle_code_element_group">
+        <xsd:sequence>
+            <xsd:element name="bundle_code" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:all>
+                        <xsd:element name="billing_code_type">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:string">
+                                    <xsd:enumeration value="CSTM-CPT"/>
+                                    <xsd:enumeration value="CSTM-NDC"/>
+                                    <xsd:enumeration value="CSTM-HCPCS"/>
+                                    <xsd:enumeration value="CSTM-RC"/>
+                                    <xsd:enumeration value="CSTM-ICD"/>
+                                    <xsd:enumeration value="CSTM-MS-DRG"/>
+                                    <xsd:enumeration value="CSTM-R-DRG"/>
+                                    <xsd:enumeration value="CSTM-S-DRG"/>
+                                    <xsd:enumeration value="CSTM-APS-DRG"/>
+                                    <xsd:enumeration value="CSTM-AP-DRG"/>
+                                    <xsd:enumeration value="CSTM-APR-DRG"/>
+                                    <xsd:enumeration value="CSTM-APC"/>
+                                    <xsd:enumeration value="CSTM-LOCAL"/>
+                                    <xsd:enumeration value="CSTM-EAPG"/>
+                                    <xsd:enumeration value="CSTM-HIPPS"/>
+                                    <xsd:enumeration value="CSTM-CDT"/>
+                                    <xsd:enumeration value="CSTM-ALL"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>
+                        </xsd:element>
+                        <xsd:element name="billing_code_type_version" type="xsd:string"/>
+                        <xsd:element name="billing_code" type="xsd:string"/>
+                        <xsd:element name="description" type="xsd:string"/>
+                    </xsd:all>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+    <xsd:group name="covered_services_element_group">
+        <xsd:sequence>
+            <xsd:element name="covered_services" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:all>
+                        <xsd:element name="billing_code_type">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:string">
+                                    <xsd:enumeration value="CSTM-CPT"/>
+                                    <xsd:enumeration value="CSTM-NDC"/>
+                                    <xsd:enumeration value="CSTM-HCPCS"/>
+                                    <xsd:enumeration value="CSTM-RC"/>
+                                    <xsd:enumeration value="CSTM-ICD"/>
+                                    <xsd:enumeration value="CSTM-MS-DRG"/>
+                                    <xsd:enumeration value="CSTM-R-DRG"/>
+                                    <xsd:enumeration value="CSTM-S-DRG"/>
+                                    <xsd:enumeration value="CSTM-APS-DRG"/>
+                                    <xsd:enumeration value="CSTM-AP-DRG"/>
+                                    <xsd:enumeration value="CSTM-APR-DRG"/>
+                                    <xsd:enumeration value="CSTM-APC"/>
+                                    <xsd:enumeration value="CSTM-LOCAL"/>
+                                    <xsd:enumeration value="CSTM-EAPG"/>
+                                    <xsd:enumeration value="CSTM-HIPPS"/>
+                                    <xsd:enumeration value="CSTM-CDT"/>
+                                    <xsd:enumeration value="CSTM-ALL"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>
+                        </xsd:element>
+                        <xsd:element name="billing_code_type_version" type="xsd:string"/>
+                        <xsd:element name="billing_code" type="xsd:string"/>
+                        <xsd:element name="description" type="xsd:string"/>
+                    </xsd:all>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+
+    <!-- children of negotiated_rate_details group -->
+    <xsd:group name="negotiated_price_group">
+        <xsd:sequence>
+            <xsd:element name="negotiated_price">
+                <xsd:complexType>
+                    <xsd:all>
+                        <xsd:element name="negotiated_type">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:string">
+                                    <xsd:enumeration value="negotiated"/>
+                                    <xsd:enumeration value="derived"/>
+                                    <xsd:enumeration value="fee schedule"/>
+                                    <xsd:enumeration value="percentage"/>
+                                    <xsd:enumeration value="per diem"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>
+                        </xsd:element>
+                        <xsd:element name="negotiated_rate" type="xsd:double"/>
+                        <!-- YYYY-MM-DD -->
+                        <xsd:element name="expiration_date" type="xsd:date"/>
+                        <xsd:element name="service_code" minOccurs="0">
+                            <xsd:complexType>
+                                <xsd:sequence>
+                                    <xsd:element name="item" maxOccurs="unbounded">
+                                        <xsd:simpleType>
+                                            <xsd:restriction base="xsd:string">
+                                                <xsd:pattern value="0[1-9]|[1-9]\d"/>
+                                            </xsd:restriction>
+                                        </xsd:simpleType>
+                                    </xsd:element>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                            <xsd:unique name="unique_service_codes">
+                                <xsd:selector xpath="service_code/item"/>
+                                <xsd:field xpath="tbd"/>
+                            </xsd:unique>
+                        </xsd:element>
+                        <xsd:element name="billing_class">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:string">
+                                    <xsd:enumeration value="professional"/>
+                                    <xsd:enumeration value="institutional"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>
+                        </xsd:element>
+                        <xsd:element name="billing_code_modifier" minOccurs="0">
+                            <xsd:complexType>
+                                <xsd:sequence>
+                                    <xsd:element name="item" maxOccurs="unbounded" type="xsd:string"/>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                            <xsd:unique name="unique_billing_code_modifier">
+                                <xsd:selector xpath="billing_code_modifier/item"/>
+                                <xsd:field xpath="tbd"/>
+                            </xsd:unique>
+                        </xsd:element>
+                        <xsd:element name="additional_information" minOccurs="0" type="xsd:string"/>
+                    </xsd:all>
+                    <!-- lower level assert -->
+                    <xsd:assert
+                        test="(count(service_code) >= 1 and billing_class[text() = 'professional']) or (billing_class[text() = 'institutional'])"/>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+
+    <!-- Requires separate element group. Referenced as a type in separate objects. -->
+    <xsd:group name="provider-reference-group-id_element_group">
+        <xsd:sequence>
+            <xsd:element name="provider_group_id" type="xsd:int"/>
+        </xsd:sequence>
+    </xsd:group>
+</xsd:schema>

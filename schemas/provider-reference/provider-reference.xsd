@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!-- edit xmlns, xmlns:xsd property to reference this file on your local system -->
+<xsd:schema xmlns="file:/path/to/provider-reference.xsd"
+    xmlns:xsd="file:/path/to/provider-reference.xsd"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    vc:minVersion="1.1">
+    
+    <element name="root">
+        <!-- Schematron Rule --> 
+        <annotation>
+            <appinfo>
+                <sch:pattern name="Arbitrary Schematron Rule">
+                    <sch:rule context="//root/provider_groups">
+                        <sch:assert test="exists(provider_groups)">
+                            ERROR: You must have a 'provider groups' array element.
+                        </sch:assert>
+                    </sch:rule>
+                </sch:pattern>
+            </appinfo>
+        </annotation>
+        
+        <complexType>
+            <all>
+                <element name="provider_groups" type="cms:provider_groups">
+                </element>
+            </all>
+        </complexType>
+    </element>
+    
+    
+<!--    provider_groups element declaration -->
+    <complexType name="provider_groups">
+            <sequence>
+                <group ref="cms:providers_element_group"></group>
+            </sequence>
+    </complexType>
+
+<!--    providers element group -->
+    <group name="providers_element_group">
+        <sequence>
+            <element name="providers" maxOccurs="unbounded">
+                <complexType>
+                    <all>
+                        <element name="npi">
+                            <complexType>
+                                <sequence>
+                                    <element name="item" type="integer" maxOccurs="unbounded"/>
+                                </sequence>
+                            </complexType>
+                            <unique name="unique_npis">
+                                <!--<selector xpath="/root/provider_groups/provider/npi/item"></selector>-->
+                                <selector xpath=".//npi"></selector>
+                                <field xpath="tbd"></field>
+                            </unique>
+                        </element>
+                        <element name="tin">
+                            <complexType>
+                                <all>
+                                    <element name="type">
+                                        <simpleType>
+                                            <restriction base="string">
+                                                <enumeration value="ein"/>
+                                                <enumeration value="npi"/>
+                                            </restriction>
+                                        </simpleType>
+                                    </element>
+                                    <element name="value" type="string"/>
+                                </all>
+                            </complexType>
+                        </element>
+                    </all>
+                </complexType>
+            </element>
+        </sequence>
+    </group>
+</schema>

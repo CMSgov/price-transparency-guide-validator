@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!-- edit xmlns, xmlns:xsd property to reference this file on your local system -->
+<xsd:schema xmlns="file:/path/to/allowed-amounts.xsd"
+    xmlns:xsd="file:/path/to/allowed-amounts.xsd"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    vc:minVersion="1.1">
+
+    <element name="root">
+        <!-- actual file definition -->
+        <complexType>
+            <all>
+                <element name="reporting_entity_name" type="string"/>
+                <element name="reporting_entity_type" type="string"/>
+                <element name="plan_name" type="string" minOccurs="0"/>
+                <element name="plan_id_type" minOccurs="0">
+                    <simpleType>
+                        <restriction base="string">
+                            <enumeration value="ein"/>
+                            <enumeration value="hios"/>
+                        </restriction>
+                    </simpleType>
+                </element>
+                <element name="plan_id" type="string" minOccurs="0"/>
+                <element name="plan_market_type" minOccurs="0">
+                    <simpleType>
+                        <restriction base="string">
+                            <enumeration value="group"/>
+                            <enumeration value="individual"/>
+                        </restriction>
+                    </simpleType>
+                </element>
+                <element name="out_of_network">
+                    <complexType>
+                        <sequence>
+                            <element name="out_of_network" type="cms:out_of_network_type" maxOccurs="unbounded"/>
+                        </sequence>
+                    </complexType>
+                </element>
+                <element name="last_updated_on" type="date"/>
+                <element name="version" type="string" minOccurs="0"/>
+            </all>
+            <assert test="count(plan_name) eq count(plan_id_type) and count(plan_name) eq count(plan_id) and count(plan_name) eq count(plan_market_type)"/>
+        </complexType>
+    </element>
+
+    <!-- out of network object definition -->
+    <complexType name="out_of_network_type">
+        <all>
+            <element name="name" type="string"/>
+            <element name="billing_code_type">
+                <simpleType>
+                    <restriction base="string">
+                        <enumeration value="CPT"/>
+                        <enumeration value="NDC"/>
+                        <enumeration value="HCPCS"/>
+                        <enumeration value="RC"/>
+                        <enumeration value="ICD"/>
+                        <enumeration value="MS-DRG"/>
+                        <enumeration value="R-DRG"/>
+                        <enumeration value="S-DRG"/>
+                        <enumeration value="APS-DRG"/>
+                        <enumeration value="AP-DRG"/>
+                        <enumeration value="APR-DRG"/>
+                        <enumeration value="APC"/>
+                        <enumeration value="LOCAL"/>
+                        <enumeration value="EAPG"/>
+                        <enumeration value="HIPPS"/>
+                        <enumeration value="CDT"/>
+                    </restriction>
+                </simpleType>
+            </element>
+            <element name="billing_code" type="string"/>
+            <element name="billing_code_type_version" type="string"/>
+            <element name="description" type="string"/>
+            <element name="allowed_amounts">
+                <complexType>
+                    <sequence>
+                        <element name="allowed_amount" type="cms:allowed_amounts_type" maxOccurs="unbounded"/>
+                    </sequence>
+                </complexType>
+            </element>
+        </all>
+    </complexType>
+    
+    <!-- allowed_amounts object definition -->
+    <complexType name="allowed_amounts_type">
+        <all>
+            <element name="tin">
+                <complexType>
+                    <all>
+                        <element name="type">
+                            <simpleType>
+                                <restriction base="string">
+                                    <enumeration value="ein"/>
+                                    <enumeration value="npi"/>
+                                </restriction>
+                            </simpleType>
+                        </element>
+                        <element name="value" type="string"/>
+                    </all>
+                </complexType>
+            </element>
+            <element name="service_code" minOccurs="0">
+                <complexType>
+                    <sequence>
+                        <element name="item" maxOccurs="unbounded">
+                            <simpleType>
+                                <restriction base="string">
+                                    <pattern value="0[1-9]|[1-9]\d"/>
+                                </restriction>
+                            </simpleType>
+                        </element>
+                    </sequence>
+                </complexType>
+                <unique name="unique_service_codes">
+                    <selector xpath="service_code/item"></selector>
+                    <field xpath="item"></field>
+                </unique>
+            </element>
+            <element name="billing_class">
+                <simpleType>
+                    <restriction base="string">
+                        <enumeration value="professional"/>
+                        <enumeration value="institutional"/>
+                    </restriction>
+                </simpleType>
+            </element>
+            <element name="payments">
+                <complexType>
+                    <sequence>
+                        <element name="out_of_network_payment" type="cms:out_of_network_payment_type" maxOccurs="unbounded"/>
+                    </sequence>
+                </complexType>
+            </element>
+        </all>
+        <assert test="(count(service_code)>=1 and billing_class[text()='professional']) or (billing_class[text()='institutional'])"/>
+    </complexType>
+    
+    <!-- out_of_network_payment object definition -->
+    <complexType name="out_of_network_payment_type">
+        <all>
+            <element name = "allowed_amount" type="double"/>
+            <element name="billing_code_modifier" minOccurs="0">
+                <complexType>
+                    <sequence>
+                        <element name="item" type="string" maxOccurs="unbounded"/>
+                    </sequence>
+                </complexType>
+            </element>
+            <element name="providers">
+                <complexType>
+                    <sequence>
+                        <element name="provider" type="cms:provider_object_type" maxOccurs="unbounded"/>
+                    </sequence>
+                </complexType>
+            </element>
+        </all>
+    </complexType>
+
+    <!-- provider object definition -->
+    <complexType name="provider_object_type">
+        <all>
+            <element name = "billed_charge" type="double"/>
+            <element name="npi">
+                <complexType>
+                    <sequence>
+                        <element name="item" type="int" maxOccurs="unbounded"/>
+                    </sequence>
+                </complexType>
+            </element>
+        </all>
+    </complexType>
+</schema>
