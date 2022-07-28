@@ -9,6 +9,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
   // check to see if supplied json file exists
   if (!fs.existsSync(dataFile)) {
     console.log(`Could not find data file: ${dataFile}`);
+    process.exitCode = 1;
     return;
   }
   // get the schema that matches the chosen version and target name. then, use it to validate.
@@ -17,6 +18,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
       runContainer(schemaPath, dataFile, options.out);
     } else {
       console.log('No schema available - not validating.');
+      process.exitCode = 1;
     }
   });
 }
@@ -37,5 +39,6 @@ export async function update() {
     }
   } catch (error) {
     console.log(`Error when updating available schemas: ${error}`);
+    process.exitCode = 1;
   }
 }
