@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu as build
 
 ARG VERSION=v1.0.0
 RUN apt-get update
@@ -8,4 +8,6 @@ COPY ./rapidjson /rapidjson
 COPY ./tclap /tclap
 RUN g++ -I /tclap/include/ schemavalidator.cpp -o validator
 
+FROM ubuntu
+COPY --from=build /validator /validator
 ENTRYPOINT ["/validator"]
