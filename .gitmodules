@@ -1,0 +1,8 @@
+[submodule "rapidjson"]
+	path = rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+	branch = master
+[submodule "tclap"]
+	path = tclap
+	url = https://git.code.sf.net/p/tclap/code
+	branch = 1.4

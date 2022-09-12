@@ -6,6 +6,6 @@ RUN apt-get install -y g++ cmake doxygen valgrind wget
 COPY ./schemavalidator.cpp /
 COPY ./rapidjson /rapidjson
 COPY ./tclap /tclap
-RUN g++ -I /tclap/include/ schemavalidator.cpp -o validator
+RUN g++ -I /rapidjson/include -I /tclap/include/ schemavalidator.cpp -o validator
 
 ENTRYPOINT ["/validator"]
