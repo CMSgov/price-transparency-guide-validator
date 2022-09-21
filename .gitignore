@@ -5,3 +5,4 @@ schema-repo/**
 coverage
 validator
 .vscode
+.DS_Store
