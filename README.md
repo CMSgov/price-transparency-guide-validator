@@ -11,13 +11,25 @@ This tool is used to validate machine-readable files in JSON format against the 
 - Git (latest version recommended, tested using 2.27.0)
 - Docker (version 19.x)
 
+### Included Libraries
+
+- [RapidJSON](https://rapidjson.org)
+- [TCLAP](https://tclap.sourceforge.net)
+
 ### Instructions
 
 Clone this repository using Git in the desired installation location:
 
 ```bash
-git clone https://github.com/CMSgov/price-transparency-guide-validator.git
+git clone --recurse-submodules https://github.com/CMSgov/price-transparency-guide-validator.git
 ```
+
+> **Hint**
+>
+> This repository references 3rd-party C++ libraries using Git submodules. If you clone without the `--recurse-submodules` flag, just run inside the repo:
+> ```bash
+> git submodule update --init
+> ```
 
 Make sure that Docker is running:
 
