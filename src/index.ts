@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { program, Option } from 'commander';
-import { validate, update } from './commands';
+import { validate, update, validateFromUrl } from './commands';
 import { config } from './utils';
 
 main().catch(error => {
@@ -24,6 +24,22 @@ async function main() {
         .default('in-network-rates')
     )
     .action(validate);
+
+  program
+    .command('from-url')
+    .description(
+      'Validate the file retrieved from a URL against a specific published version of a CMS schema.'
+    )
+    .usage('<data-url> <schema-version> [options]')
+    .argument('<data-url>', 'URL to data file to validate')
+    .argument('<schema-version>', 'version of schema to use for validation')
+    .option('-o, --out <out>', 'output path')
+    .addOption(
+      new Option('-t, --target <schema>', 'name of schema to use')
+        .choices(config.AVAILABLE_SCHEMAS)
+        .default('in-network-rates')
+    )
+    .action(validateFromUrl);
 
   program
     .command('update')

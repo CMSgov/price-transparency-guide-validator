@@ -22,7 +22,7 @@ describe('utils', () => {
       );
       // since the container is running linux, it should always use / as its path separator.
       // but, the paths on the host system should be built by path
-      const expectedCommand = `docker run -v "${path.join(
+      const expectedCommand = `docker run --rm -v "${path.join(
         path.resolve(SEP),
         'some',
         'useful'
@@ -40,7 +40,7 @@ describe('utils', () => {
         path.join('results', 'output.txt'), // this is a relative path
         'dadb0d'
       );
-      const expectedCommand = `docker run -v "${path.join(
+      const expectedCommand = `docker run --rm -v "${path.join(
         PROJECT_DIR,
         'some',
         'useful'
