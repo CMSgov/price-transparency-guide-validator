@@ -23,6 +23,10 @@ async function main() {
         .choices(config.AVAILABLE_SCHEMAS)
         .default('in-network-rates')
     )
+    .option(
+      '-s, --strict',
+      'enable strict checking, which prohibits additional properties in data file'
+    )
     .action(validate);
 
   program
