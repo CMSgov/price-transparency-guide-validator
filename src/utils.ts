@@ -22,7 +22,7 @@ export async function ensureRepo(repoDirectory: string) {
   }
 }
 
-export async function useRepoVersion(schemaVersion: string, schemaName: string) {
+export async function useRepoVersion(schemaVersion: string, schemaName: string, strict = false) {
   try {
     await ensureRepo(config.SCHEMA_REPO_FOLDER);
     const tagResult = await validatorUtils.promisify(exec)(
@@ -36,9 +36,14 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
       await validatorUtils.promisify(exec)(
         `git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`
       );
-      const schemaContents = fs.readFileSync(
+      let schemaContents: string | Buffer = fs.readFileSync(
         path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
       );
+      if (strict) {
+        const modifiedSchema = JSON.parse(schemaContents.toString('utf-8'));
+        makeSchemaStrict(modifiedSchema);
+        schemaContents = JSON.stringify(modifiedSchema);
+      }
       // write this version of the schema to a temporary file
       temp.track();
       const schemaDir = temp.mkdirSync('schemas');
@@ -57,6 +62,19 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string) 
   } catch (error) {
     console.log(`Error when accessing schema: ${error}`);
     process.exitCode = 1;
+  }
+}
+
+// note that this only sets additionalProperties to false at the top level, and at the first level of definitions.
+// if there are nested definitions, those will not be modified.
+function makeSchemaStrict(schema: any) {
+  if (typeof schema === 'object') {
+    schema.additionalProperties = false;
+    if (schema.definitions != null && typeof schema.definitions === 'object') {
+      for (const defKey of Object.keys(schema.definitions)) {
+        schema.definitions[defKey].additionalProperties = false;
+      }
+    }
   }
 }
 

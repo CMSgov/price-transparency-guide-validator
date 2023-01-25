@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "food": {
+      "enum": [
+        "orange",
+        "apple",
+        "banana",
+        "pear"
+      ]
+    },
+    "garment": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "material": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "snacks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/food"
+      }
+    },
+    "clothes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/garment"
+      }
+    }
+  }
+}

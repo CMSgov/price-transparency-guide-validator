@@ -27,6 +27,7 @@ git clone --recurse-submodules https://github.com/CMSgov/price-transparency-guid
 > **Hint**
 >
 > This repository references 3rd-party C++ libraries using Git submodules. If you clone without the `--recurse-submodules` flag, just run inside the repo:
+>
 > ```bash
 > git submodule update --init
 > ```
@@ -112,10 +113,13 @@ Arguments:
 
 Options:
   -o, --out <out>        output path
-  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference",
-                         "table-of-contents", default: "in-network-rates")
+  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents", default:
+                         "in-network-rates")
+  -s, --strict           enable strict checking, which prohibits additional properties in data file
   -h, --help             display help for command
 ```
+
+The purpose of the `strict` option is to help detect when an optional attribute has been spelled incorrectly. Because additional properties are allowed by the schema, a misspelled optional attribute does not normally cause a validation failure.
 
 ### Test file validation
 
