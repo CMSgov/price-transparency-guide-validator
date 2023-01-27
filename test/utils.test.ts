@@ -55,8 +55,11 @@ describe('utils', () => {
   describe('#useRepoVersion', () => {
     let oldRepoFolder: string;
     beforeAll(async () => {
-      // set up our test repo
+      // set up our test repo with a sample schema
       const repoDirectory = temp.mkdirSync();
+      const sampleSchema = JSON.parse(
+        readFileSync(path.join(__dirname, 'fixtures', 'sampleSchema.json'), 'utf-8')
+      );
       ensureDirSync(path.join(repoDirectory, 'schemas', 'something-good'));
       oldRepoFolder = validatorUtils.config.SCHEMA_REPO_FOLDER;
       validatorUtils.config.SCHEMA_REPO_FOLDER = repoDirectory;
@@ -65,14 +68,17 @@ describe('utils', () => {
       await execP(`git -C "${repoDirectory}" config user.email "test-user@example.org"`);
       // create a few commits and tag them
       const schemaPath = path.join('schemas', 'something-good', 'something-good.json');
-      writeFileSync(path.join(repoDirectory, schemaPath), 'first schema info');
+      sampleSchema.version = '0.3';
+      writeFileSync(path.join(repoDirectory, schemaPath), JSON.stringify(sampleSchema));
       await execP(`git -C "${repoDirectory}" add -A`);
       await execP(`git -C "${repoDirectory}" commit -m "first commit"`);
       await execP(`git -C "${repoDirectory}" tag -a "v0.3" -m ""`);
-      writeFileSync(path.join(repoDirectory, schemaPath), 'schema for version 0.7');
+      sampleSchema.version = '0.7';
+      writeFileSync(path.join(repoDirectory, schemaPath), JSON.stringify(sampleSchema));
       await execP(`git -C "${repoDirectory}" commit -am "second commit"`);
       await execP(`git -C "${repoDirectory}" tag -a "v0.7" -m ""`);
-      writeFileSync(path.join(repoDirectory, schemaPath), 'this is the first published schema');
+      sampleSchema.version = '1.0';
+      writeFileSync(path.join(repoDirectory, schemaPath), JSON.stringify(sampleSchema));
       await execP(`git -C "${repoDirectory}" commit -am "third commit"`);
       await execP(`git -C "${repoDirectory}" tag -a "v1.0" -m ""`);
     });
@@ -85,8 +91,8 @@ describe('utils', () => {
     it('should return a file path to the schema contents at the specified version', async () => {
       const result = await validatorUtils.useRepoVersion('v0.7', 'something-good');
       expect(result).toBeDefined();
-      const contents = readFileSync(<string>result, { encoding: 'utf-8' });
-      expect(contents).toBe('schema for version 0.7');
+      const contents = JSON.parse(readFileSync(<string>result, { encoding: 'utf-8' }));
+      expect(contents.version).toBe('0.7');
     });
 
     it('should return undefined when the given tag is not available', async () => {
@@ -97,6 +103,16 @@ describe('utils', () => {
     it('should return undefined when the given schema is not available', async () => {
       const result = await validatorUtils.useRepoVersion('v0.3', 'something-bad');
       expect(result).toBeUndefined();
+    });
+
+    it('should set additionalProperties to false on all definitions when strict is true', async () => {
+      const result = await validatorUtils.useRepoVersion('v1.0', 'something-good', true);
+      expect(result).toBeDefined();
+      const contents = JSON.parse(readFileSync(<string>result, { encoding: 'utf-8' }));
+      expect(contents.version).toBe('1.0');
+      expect(contents.additionalProperties).toBeFalse();
+      expect(contents.definitions.food.additionalProperties).toBeFalse();
+      expect(contents.definitions.garment.additionalProperties).toBeFalse();
     });
   });
 });

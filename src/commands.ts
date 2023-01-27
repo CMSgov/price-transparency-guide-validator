@@ -23,7 +23,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
     return;
   }
   // get the schema that matches the chosen version and target name. then, use it to validate.
-  useRepoVersion(schemaVersion, options.target).then(schemaPath => {
+  useRepoVersion(schemaVersion, options.target, options.strict).then(schemaPath => {
     if (schemaPath != null) {
       runContainer(schemaPath, dataFile, options.out);
     } else {
