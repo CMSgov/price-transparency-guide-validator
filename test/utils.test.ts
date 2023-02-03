@@ -5,6 +5,7 @@ import util from 'util';
 import { exec } from 'child_process';
 import nock from 'nock';
 import readlineSync from 'readline-sync';
+import fs from 'fs-extra';
 
 import * as validatorUtils from '../src/utils';
 import { ensureDirSync, readFileSync, writeFileSync } from 'fs-extra';
@@ -175,6 +176,77 @@ describe('utils', () => {
       nock('http://example.org').head('/data.json').reply(404);
       const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
       expect(result).toBeFalse();
+    });
+  });
+
+  describe('#downloadDataFile', () => {
+    afterEach(() => {
+      nock.cleanAll();
+      temp.cleanupSync();
+    });
+
+    it('should write a file to the specified folder', async () => {
+      const simpleData = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      nock('http://example.org').get('/data.json').reply(200, simpleData);
+      const outputDir = temp.mkdirSync();
+      await validatorUtils.downloadDataFile('http://example.org/data.json', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readFileSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should write a decompressed gz file to the specified folder', async () => {
+      const simpleData = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleGz = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleData.gz'));
+      nock('http://example.org')
+        .get('/data.gz')
+        .reply(200, simpleGz, { 'content-type': 'application/gzip' });
+      const outputDir = temp.mkdirSync();
+      await validatorUtils.downloadDataFile('http://example.org/data.gz', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readFileSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should write a json file within a zip to the specified folder', async () => {
+      const simpleData = fs.readFileSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleZip.zip'));
+      nock('http://example.org')
+        .get('/data.zip')
+        .reply(200, simpleZip, { 'content-type': 'application/zip' });
+      const outputDir = temp.mkdirSync();
+      await validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readFileSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should reject when a zip contains no json files', async () => {
+      const wrongZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'allWrong.zip'));
+      nock('http://example.org')
+        .get('/data.zip')
+        .reply(200, wrongZip, { 'content-type': 'application/zip' });
+      const outputDir = temp.mkdirSync();
+      await expect(
+        validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir)
+      ).toReject();
+    });
+
+    it('should reject when the url is not valid', async () => {
+      nock('http://example.org').get('/data.json').reply(500);
+      const outputDir = temp.mkdirSync();
+      await expect(
+        validatorUtils.downloadDataFile('http://example.org/data.json', outputDir)
+      ).toReject();
     });
   });
 });
