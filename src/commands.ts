@@ -36,15 +36,17 @@ export async function validateFromUrl(
   temp.track();
   try {
     if (await checkDataUrl(dataUrl)) {
-      return useRepoVersion(schemaVersion, options.target).then(async schemaPath => {
-        if (schemaPath != null) {
-          const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
-          return await runContainer(schemaPath, dataFile, options.out);
-        } else {
-          console.log('No schema available - not validating.');
-          process.exitCode = 1;
+      return useRepoVersion(schemaVersion, options.target, options.strict).then(
+        async schemaPath => {
+          if (schemaPath != null) {
+            const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
+            return await runContainer(schemaPath, dataFile, options.out);
+          } else {
+            console.log('No schema available - not validating.');
+            process.exitCode = 1;
+          }
         }
-      });
+      );
     } else {
       console.log('Exiting.');
       process.exitCode = 1;
