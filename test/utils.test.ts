@@ -3,6 +3,8 @@ import path from 'path';
 import temp from 'temp';
 import util from 'util';
 import { exec } from 'child_process';
+import nock from 'nock';
+import readlineSync from 'readline-sync';
 
 import * as validatorUtils from '../src/utils';
 import { ensureDirSync, readFileSync, writeFileSync } from 'fs-extra';
@@ -113,6 +115,66 @@ describe('utils', () => {
       expect(contents.additionalProperties).toBeFalse();
       expect(contents.definitions.food.additionalProperties).toBeFalse();
       expect(contents.definitions.garment.additionalProperties).toBeFalse();
+    });
+  });
+
+  describe('#checkDataUrl', () => {
+    let keyInYNStrictSpy: jest.SpyInstance;
+
+    beforeAll(() => {
+      keyInYNStrictSpy = jest.spyOn(readlineSync, 'keyInYNStrict');
+    });
+
+    afterEach(() => {
+      nock.cleanAll();
+    });
+
+    afterAll(() => {
+      keyInYNStrictSpy.mockRestore();
+    });
+
+    it('should return true when the url is valid and the content length is less than one GB', async () => {
+      nock('http://example.org').head('/data.json').reply(200, '', { 'content-length': '500' });
+      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeTrue();
+    });
+
+    it('should return true when the url is valid and the user approves a content length greater than one GB', async () => {
+      nock('http://example.org')
+        .head('/data.json')
+        .reply(200, '', { 'content-length': (Math.pow(1024, 3) * 2).toString() });
+      keyInYNStrictSpy.mockReturnValueOnce(true);
+      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeTrue();
+    });
+
+    it('should return false when the url is valid and the user rejects a content length greater than one GB', async () => {
+      nock('http://example.org')
+        .head('/data.json')
+        .reply(200, '', { 'content-length': (Math.pow(1024, 3) * 2).toString() });
+      keyInYNStrictSpy.mockReturnValueOnce(false);
+      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeFalse();
+    });
+
+    it('should return true when the url is valid and the user approves an unknown content length', async () => {
+      nock('http://example.org').head('/data.json').reply(200);
+      keyInYNStrictSpy.mockReturnValueOnce(true);
+      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeTrue();
+    });
+
+    it('should return false when the url is valid and the user rejects an unknown content length', async () => {
+      nock('http://example.org').head('/data.json').reply(200);
+      keyInYNStrictSpy.mockReturnValueOnce(false);
+      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeFalse();
+    });
+
+    it('should return false when the url is not valid', async () => {
+      nock('http://example.org').head('/data.json').reply(404);
+      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeFalse();
     });
   });
 });
