@@ -15,6 +15,10 @@ const PROJECT_DIR = path.resolve(path.join(__dirname, '..'));
 const execP = util.promisify(exec);
 
 describe('utils', () => {
+  beforeAll(() => {
+    temp.track();
+  });
+
   describe('#buildRunCommand', () => {
     it('should build the command to run the validation container without an output path', () => {
       const result = validatorUtils.buildRunCommand(
@@ -88,7 +92,6 @@ describe('utils', () => {
 
     afterAll(() => {
       validatorUtils.config.SCHEMA_REPO_FOLDER = oldRepoFolder;
-      temp.cleanupSync();
     });
 
     it('should return a file path to the schema contents at the specified version', async () => {
@@ -182,11 +185,10 @@ describe('utils', () => {
   describe('#downloadDataFile', () => {
     afterEach(() => {
       nock.cleanAll();
-      temp.cleanupSync();
     });
 
     it('should write a file to the specified folder', async () => {
-      const simpleData = fs.readFileSync(
+      const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
         'utf-8'
       );
@@ -194,12 +196,12 @@ describe('utils', () => {
       const outputDir = temp.mkdirSync();
       await validatorUtils.downloadDataFile('http://example.org/data.json', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readFileSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
     it('should write a decompressed gz file to the specified folder', async () => {
-      const simpleData = fs.readFileSync(
+      const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
         'utf-8'
       );
@@ -210,12 +212,12 @@ describe('utils', () => {
       const outputDir = temp.mkdirSync();
       await validatorUtils.downloadDataFile('http://example.org/data.gz', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readFileSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
     it('should write a json file within a zip to the specified folder', async () => {
-      const simpleData = fs.readFileSync(
+      const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
         'utf-8'
       );
@@ -226,7 +228,7 @@ describe('utils', () => {
       const outputDir = temp.mkdirSync();
       await validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readFileSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
