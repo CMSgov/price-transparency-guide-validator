@@ -113,13 +113,42 @@ Arguments:
 
 Options:
   -o, --out <out>        output path
-  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents", default:
-                         "in-network-rates")
+  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents", default: "in-network-rates")
   -s, --strict           enable strict checking, which prohibits additional properties in data file
   -h, --help             display help for command
 ```
 
 The purpose of the `strict` option is to help detect when an optional attribute has been spelled incorrectly. Because additional properties are allowed by the schema, a misspelled optional attribute does not normally cause a validation failure.
+
+### Validate a file at a URL
+
+It is also possible to specify a URL to the file to validate. From the installed directory:
+
+```
+cms-mrf-validator from-url <data-url> <schema-version> [-o out] [-t target]
+```
+
+The only difference in arguments is that a URL should be provided instead of a path to a file. All options from the `validate` command still apply. The URL must return a file that is one of the following:
+
+- a JSON file
+- a GZ-compressed JSON file
+- a ZIP archive that contains a JSON file. Note that the validator will attempt to use the first JSON file it finds within the ZIP archive.
+
+Further details:
+
+```
+Validate the file retrieved from a URL against a specific published version of a CMS schema.
+
+Arguments:
+  data-url               URL to data file to validate
+  schema-version         version of schema to use for validation
+
+Options:
+  -o, --out <out>        output path
+  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents", default: "in-network-rates")
+  -s, --strict           enable strict checking, which prohibits additional properties in data file
+  -h, --help             display help for command
+```
 
 ### Test file validation
 

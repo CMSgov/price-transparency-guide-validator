@@ -1,8 +1,13 @@
-import validatorUtils from 'util';
+import util from 'util';
+import axios from 'axios';
+import readlineSync from 'readline-sync';
 import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
 import temp from 'temp';
+import { createGunzip } from 'zlib';
+import { pipeline } from 'stream/promises';
+import yauzl from 'yauzl';
 
 export const config = {
   AVAILABLE_SCHEMAS: [
@@ -15,17 +20,20 @@ export const config = {
   SCHEMA_REPO_FOLDER: path.normalize(path.join(__dirname, '..', 'schema-repo'))
 };
 
+const ONE_MEGABYTE = 1024 * 1024;
+const DATA_SIZE_WARNING_THRESHOLD = ONE_MEGABYTE * 1024; // 1 gigabyte
+
 export async function ensureRepo(repoDirectory: string) {
   // check if the repo exists, and if not, try to clone it
   if (!fs.existsSync(path.join(repoDirectory, '.git'))) {
-    return validatorUtils.promisify(exec)(`git clone ${config.SCHEMA_REPO_URL} "${repoDirectory}"`);
+    return util.promisify(exec)(`git clone ${config.SCHEMA_REPO_URL} "${repoDirectory}"`);
   }
 }
 
 export async function useRepoVersion(schemaVersion: string, schemaName: string, strict = false) {
   try {
     await ensureRepo(config.SCHEMA_REPO_FOLDER);
-    const tagResult = await validatorUtils.promisify(exec)(
+    const tagResult = await util.promisify(exec)(
       `git -C "${config.SCHEMA_REPO_FOLDER}" tag --list --sort=taggerdate`
     );
     const tags = tagResult.stdout
@@ -33,9 +41,7 @@ export async function useRepoVersion(schemaVersion: string, schemaName: string, 
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
     if (tags.includes(schemaVersion)) {
-      await validatorUtils.promisify(exec)(
-        `git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`
-      );
+      await util.promisify(exec)(`git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`);
       let schemaContents: string | Buffer = fs.readFileSync(
         path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
       );
@@ -108,7 +114,7 @@ export function buildRunCommand(
 
 export async function runContainer(schemaPath: string, dataPath: string, outputPath: string) {
   try {
-    const containerId = await validatorUtils
+    const containerId = await util
       .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
       .then(result => result.stdout.trim())
       .catch(reason => {
@@ -117,7 +123,7 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
       });
     if (containerId.length > 0) {
       const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, containerId);
-      return validatorUtils
+      return util
         .promisify(exec)(runCommand)
         .then(result => {
           console.log(result.stdout);
@@ -135,4 +141,119 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
     console.log(`Error when running validator container: ${error}`);
     process.exitCode = 1;
   }
+}
+
+export async function checkDataUrl(url: string) {
+  try {
+    const response = await axios.head(url);
+    if (response.status === 200) {
+      let proceedToDownload: boolean;
+      const contentLength = parseInt(response.headers['content-length']);
+      if (isNaN(contentLength)) {
+        proceedToDownload = readlineSync.keyInYNStrict(
+          'Data file size is unknown. Download this file?'
+        );
+      } else if (contentLength > DATA_SIZE_WARNING_THRESHOLD) {
+        proceedToDownload = readlineSync.keyInYNStrict(
+          `Data file is ${(contentLength / ONE_MEGABYTE).toFixed(
+            2
+          )} MB in size. Download this file?`
+        );
+      } else {
+        proceedToDownload = true;
+      }
+      return proceedToDownload;
+    } else {
+      console.log(
+        `Received unsuccessful status code ${response.status} when checking data file URL.`
+      );
+      return false;
+    }
+  } catch (e) {
+    console.log('Request failed when checking data file URL.');
+    console.log(e.message);
+    return false;
+  }
+}
+
+export async function downloadDataFile(url: string, folder: string): Promise<string> {
+  const filenameGuess = 'data.json';
+  const dataPath = path.join(folder, filenameGuess);
+  return new Promise((resolve, reject) => {
+    console.log('Beginning download...');
+    axios({
+      method: 'get',
+      url: url,
+      responseType: 'stream'
+    })
+      .then(response => {
+        const contentType = response.headers['content-type'];
+        console.log('content type', contentType);
+        if (isZip(contentType)) {
+          // zips require additional work to find a JSON file inside
+          const zipPath = path.join(folder, 'data.zip');
+          const zipOutputStream = fs.createWriteStream(zipPath);
+          pipeline(response.data, zipOutputStream).then(() => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipFile) => {
+              if (err != null) {
+                reject(err);
+              }
+              let foundJsonFile: string;
+              zipFile.on('entry', (entry: yauzl.Entry) => {
+                if (entry.fileName.endsWith('.json')) {
+                  zipFile.openReadStream(entry, (err, readStream) => {
+                    foundJsonFile = entry.fileName;
+                    const outputStream = fs.createWriteStream(dataPath);
+                    outputStream.on('finish', () => {
+                      console.log('Download complete.');
+                      resolve(dataPath);
+                    });
+                    outputStream.on('error', () => {
+                      reject('Error writing downloaded file.');
+                    });
+                    readStream.pipe(outputStream);
+                  });
+                } else {
+                  zipFile.readEntry();
+                }
+              });
+
+              zipFile.on('end', () => {
+                if (foundJsonFile == null) {
+                  reject('No JSON file present in zip.');
+                }
+              });
+
+              zipFile.readEntry();
+            });
+          });
+        } else {
+          const outputStream = fs.createWriteStream(dataPath);
+          outputStream.on('finish', () => {
+            console.log('Download complete.');
+            resolve(dataPath);
+          });
+          outputStream.on('error', () => {
+            reject('Error writing downloaded file.');
+          });
+
+          if (isGzip(contentType)) {
+            pipeline(response.data, createGunzip(), outputStream);
+          } else {
+            response.data.pipe(outputStream);
+          }
+        }
+      })
+      .catch(reason => {
+        reject('Error downloading data file.');
+      });
+  });
+}
+
+function isGzip(contentType: string): boolean {
+  return contentType === 'application/gzip' || contentType === 'application/x-gzip';
+}
+
+function isZip(contentType: string): boolean {
+  return contentType === 'application/zip';
 }

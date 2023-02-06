@@ -3,7 +3,12 @@ import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
 import { OptionValues } from 'commander';
-import { config, runContainer, useRepoVersion } from './utils';
+
+import { config, runContainer, useRepoVersion, downloadDataFile, checkDataUrl } from './utils';
+import temp from 'temp';
+import crypto from 'crypto';
+
+crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION;
 
 export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
   // check to see if supplied json file exists
@@ -21,6 +26,34 @@ export async function validate(dataFile: string, schemaVersion: string, options:
       process.exitCode = 1;
     }
   });
+}
+
+export async function validateFromUrl(
+  dataUrl: string,
+  schemaVersion: string,
+  options: OptionValues
+) {
+  temp.track();
+  try {
+    if (await checkDataUrl(dataUrl)) {
+      return useRepoVersion(schemaVersion, options.target, options.strict).then(
+        async schemaPath => {
+          if (schemaPath != null) {
+            const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
+            return await runContainer(schemaPath, dataFile, options.out);
+          } else {
+            console.log('No schema available - not validating.');
+            process.exitCode = 1;
+          }
+        }
+      );
+    } else {
+      console.log('Exiting.');
+      process.exitCode = 1;
+    }
+  } finally {
+    temp.cleanupSync();
+  }
 }
 
 export async function update() {
