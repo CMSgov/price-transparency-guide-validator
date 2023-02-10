@@ -180,15 +180,29 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
   const filenameGuess = 'data.json';
   const dataPath = path.join(folder, filenameGuess);
   return new Promise((resolve, reject) => {
-    console.log('Beginning download...');
+    console.log('Beginning download...\n');
     axios({
       method: 'get',
       url: url,
-      responseType: 'stream'
+      responseType: 'stream',
+      onDownloadProgress: progressEvent => {
+        let progressText: string;
+        if (progressEvent.progress != null) {
+          progressText = `Downloaded ${Math.floor(progressEvent.progress * 100)}% of file (${
+            progressEvent.loaded
+          } bytes)`;
+        } else {
+          progressText = `Downloaded ${progressEvent.loaded} bytes`;
+        }
+        process.stdout.clearLine(0, () => {
+          process.stdout.cursorTo(0, () => {
+            process.stdout.write(progressText);
+          });
+        });
+      }
     })
       .then(response => {
         const contentType = response.headers['content-type'];
-        console.log('content type', contentType);
         if (isZip(contentType)) {
           // zips require additional work to find a JSON file inside
           const zipPath = path.join(folder, 'data.zip');
@@ -205,7 +219,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
                     foundJsonFile = entry.fileName;
                     const outputStream = fs.createWriteStream(dataPath);
                     outputStream.on('finish', () => {
-                      console.log('Download complete.');
+                      console.log('\nDownload complete.');
                       resolve(dataPath);
                     });
                     outputStream.on('error', () => {
@@ -230,7 +244,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
         } else {
           const outputStream = fs.createWriteStream(dataPath);
           outputStream.on('finish', () => {
-            console.log('Download complete.');
+            console.log('\nDownload complete.');
             resolve(dataPath);
           });
           outputStream.on('error', () => {
