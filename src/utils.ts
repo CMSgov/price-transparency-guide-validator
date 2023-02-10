@@ -186,19 +186,21 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
       url: url,
       responseType: 'stream',
       onDownloadProgress: progressEvent => {
-        let progressText: string;
-        if (progressEvent.progress != null) {
-          progressText = `Downloaded ${Math.floor(progressEvent.progress * 100)}% of file (${
-            progressEvent.loaded
-          } bytes)`;
-        } else {
-          progressText = `Downloaded ${progressEvent.loaded} bytes`;
-        }
-        process.stdout.clearLine(0, () => {
-          process.stdout.cursorTo(0, () => {
-            process.stdout.write(progressText);
+        if (process.stdout.isTTY) {
+          let progressText: string;
+          if (progressEvent.progress != null) {
+            progressText = `Downloaded ${Math.floor(progressEvent.progress * 100)}% of file (${
+              progressEvent.loaded
+            } bytes)`;
+          } else {
+            progressText = `Downloaded ${progressEvent.loaded} bytes`;
+          }
+          process.stdout.clearLine(0, () => {
+            process.stdout.cursorTo(0, () => {
+              process.stdout.write(progressText);
+            });
           });
-        });
+        }
       }
     })
       .then(response => {
