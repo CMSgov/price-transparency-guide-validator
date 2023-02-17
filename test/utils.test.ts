@@ -200,7 +200,7 @@ describe('utils', () => {
       expect(downloadedData).toEqual(simpleData);
     });
 
-    it('should write a decompressed gz file to the specified folder', async () => {
+    it('should write a decompressed gz file when the response has content type application/gzip', async () => {
       const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
         'utf-8'
@@ -209,6 +209,22 @@ describe('utils', () => {
       nock('http://example.org')
         .get('/data.gz')
         .reply(200, simpleGz, { 'content-type': 'application/gzip' });
+      const outputDir = temp.mkdirSync();
+      await validatorUtils.downloadDataFile('http://example.org/data.gz', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should write a decompressed gz file when the response has content type application/octet-stream and the url ends with .gz', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleGz = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleData.gz'));
+      nock('http://example.org')
+        .get('/data.gz')
+        .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
       const outputDir = temp.mkdirSync();
       await validatorUtils.downloadDataFile('http://example.org/data.gz', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
@@ -225,6 +241,22 @@ describe('utils', () => {
       nock('http://example.org')
         .get('/data.zip')
         .reply(200, simpleZip, { 'content-type': 'application/zip' });
+      const outputDir = temp.mkdirSync();
+      await validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should write a json file within a zip when the response has content type application/octet-stream and the url ends with .zip', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleZip.zip'));
+      nock('http://example.org')
+        .get('/data.zip')
+        .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
       const outputDir = temp.mkdirSync();
       await validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));

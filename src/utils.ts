@@ -204,8 +204,8 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
       }
     })
       .then(response => {
-        const contentType = response.headers['content-type'];
-        if (isZip(contentType)) {
+        const contentType = response.headers['content-type'] ?? 'application/octet-stream';
+        if (isZip(contentType, url)) {
           // zips require additional work to find a JSON file inside
           const zipPath = path.join(folder, 'data.zip');
           const zipOutputStream = fs.createWriteStream(zipPath);
@@ -253,7 +253,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
             reject('Error writing downloaded file.');
           });
 
-          if (isGzip(contentType)) {
+          if (isGzip(contentType, url)) {
             pipeline(response.data, createGunzip(), outputStream);
           } else {
             response.data.pipe(outputStream);
@@ -266,10 +266,17 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
   });
 }
 
-function isGzip(contentType: string): boolean {
-  return contentType === 'application/gzip' || contentType === 'application/x-gzip';
+function isGzip(contentType: string, url: string): boolean {
+  return (
+    contentType === 'application/gzip' ||
+    contentType === 'application/x-gzip' ||
+    (contentType === 'application/octet-stream' && url.endsWith('.gz'))
+  );
 }
 
-function isZip(contentType: string): boolean {
-  return contentType === 'application/zip';
+function isZip(contentType: string, url: string): boolean {
+  return (
+    contentType === 'application/zip' ||
+    (contentType === 'application/octet-stream' && url.endsWith('.zip'))
+  );
 }
