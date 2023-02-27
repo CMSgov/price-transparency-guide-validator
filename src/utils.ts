@@ -123,6 +123,7 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
       });
     if (containerId.length > 0) {
       const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, containerId);
+      console.log('Running validator container...');
       return util
         .promisify(exec)(runCommand)
         .then(result => {
@@ -210,36 +211,47 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
           const zipPath = path.join(folder, 'data.zip');
           const zipOutputStream = fs.createWriteStream(zipPath);
           pipeline(response.data, zipOutputStream).then(() => {
-            yauzl.open(zipPath, { lazyEntries: true }, (err, zipFile) => {
+            yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (err, zipFile) => {
               if (err != null) {
                 reject(err);
               }
-              let foundJsonFile: string;
+              const jsonEntries: yauzl.Entry[] = [];
+
               zipFile.on('entry', (entry: yauzl.Entry) => {
                 if (entry.fileName.endsWith('.json')) {
-                  zipFile.openReadStream(entry, (err, readStream) => {
-                    foundJsonFile = entry.fileName;
+                  jsonEntries.push(entry);
+                }
+                zipFile.readEntry();
+              });
+
+              zipFile.on('end', () => {
+                console.log('\nDownload complete.');
+                if (jsonEntries.length === 0) {
+                  reject('No JSON file present in zip.');
+                } else {
+                  let chosenEntry: yauzl.Entry;
+                  if (jsonEntries.length === 1) {
+                    chosenEntry = jsonEntries[0];
+                  } else {
+                    jsonEntries.sort((a, b) => {
+                      return a.fileName.localeCompare(b.fileName);
+                    });
+                    chosenEntry = chooseJsonFile(jsonEntries);
+                  }
+                  zipFile.openReadStream(chosenEntry, (err, readStream) => {
                     const outputStream = fs.createWriteStream(dataPath);
                     outputStream.on('finish', () => {
-                      console.log('\nDownload complete.');
+                      zipFile.close();
                       resolve(dataPath);
                     });
                     outputStream.on('error', () => {
+                      zipFile.close();
                       reject('Error writing downloaded file.');
                     });
                     readStream.pipe(outputStream);
                   });
-                } else {
-                  zipFile.readEntry();
                 }
               });
-
-              zipFile.on('end', () => {
-                if (foundJsonFile == null) {
-                  reject('No JSON file present in zip.');
-                }
-              });
-
               zipFile.readEntry();
             });
           });
@@ -279,4 +291,70 @@ function isZip(contentType: string, url: string): boolean {
     contentType === 'application/zip' ||
     (contentType === 'application/octet-stream' && url.endsWith('.zip'))
   );
+}
+
+function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
+  // there might be a lot of entries. show ten per page of results
+  console.log(`${entries.length} JSON files found within ZIP archive.`);
+  const maxPage = Math.floor((entries.length - 1) / 10);
+  let currentPage = 0;
+  let chosenIndex: number;
+
+  showMenuOptions(
+    currentPage,
+    maxPage,
+    entries.slice(currentPage * 10, currentPage * 10 + 10).map(ent => ent.fileName)
+  );
+  readlineSync.promptCLLoop((command, ...extraArgs) => {
+    if (/^n(ext)?$/i.test(command)) {
+      if (currentPage < maxPage) {
+        currentPage++;
+      } else {
+        console.log('Already at last page.');
+      }
+    } else if (/^p(revious)?$/i.test(command)) {
+      if (currentPage > 0) {
+        currentPage--;
+      } else {
+        console.log('Already at first page.');
+      }
+    } else if (/^go?$/i.test(command)) {
+      const targetPage = parseInt(extraArgs[0]);
+      if (targetPage > 0 && targetPage <= maxPage + 1) {
+        currentPage = targetPage - 1;
+      } else {
+        console.log("Can't go to that page.");
+      }
+    } else if (/^\d$/.test(command)) {
+      chosenIndex = currentPage * 10 + parseInt(command);
+      console.log(`You selected: ${entries[chosenIndex].fileName}`);
+      return true;
+    } else {
+      console.log('Unrecognized command.');
+    }
+    showMenuOptions(
+      currentPage,
+      maxPage,
+      entries.slice(currentPage * 10, (currentPage + 1) * 10).map(ent => ent.fileName)
+    );
+  });
+  return entries[chosenIndex];
+}
+
+function showMenuOptions(currentPage: number, maxPage: number, items: string[]) {
+  console.log(`Showing page ${currentPage + 1} of ${maxPage + 1}`);
+  items.forEach((item, idx) => {
+    console.log(`(${idx}): ${item}`);
+  });
+  const commandsToShow: string[] = [];
+  if (currentPage > 0) {
+    commandsToShow.push('(p)revious page');
+  }
+  if (currentPage < maxPage) {
+    commandsToShow.push('(n)ext page');
+  }
+  if (maxPage > 0) {
+    commandsToShow.push('"(g)o X" to jump to a page');
+  }
+  console.log(commandsToShow.join(' | '));
 }
