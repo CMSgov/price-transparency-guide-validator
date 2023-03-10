@@ -132,7 +132,7 @@ The only difference in arguments is that a URL should be provided instead of a p
 
 - a JSON file
 - a GZ-compressed JSON file
-- a ZIP archive that contains a JSON file. Note that the validator will attempt to use the first JSON file it finds within the ZIP archive.
+- a ZIP archive that contains a JSON file. If multiple JSON files are found within the ZIP archive, you can choose which one you want to validate.
 
 Further details:
 
