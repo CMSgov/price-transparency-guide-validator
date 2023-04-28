@@ -2,9 +2,18 @@ import util from 'util';
 import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
+import readlineSync from 'readline-sync';
 import { OptionValues } from 'commander';
 
-import { config, runContainer, useRepoVersion, downloadDataFile, checkDataUrl } from './utils';
+import {
+  config,
+  runContainer,
+  useRepoVersion,
+  downloadDataFile,
+  checkDataUrl,
+  chooseJsonFile,
+  getEntryFromZip
+} from './utils';
 import temp from 'temp';
 import crypto from 'crypto';
 
@@ -40,7 +49,21 @@ export async function validateFromUrl(
         async schemaPath => {
           if (schemaPath != null) {
             const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
-            return await runContainer(schemaPath, dataFile, options.out);
+            if (typeof dataFile === 'string') {
+              return await runContainer(schemaPath, dataFile, options.out);
+            } else {
+              let continuation = true;
+              // we have multiple files, so let's choose as many as we want
+              while (continuation === true) {
+                const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
+                await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
+                await runContainer(schemaPath, dataFile.dataPath, options.out);
+                continuation = readlineSync.keyInYNStrict(
+                  'Would you like to validate another file in the ZIP?'
+                );
+              }
+              dataFile.zipFile.close();
+            }
           } else {
             console.log('No schema available - not validating.');
             process.exitCode = 1;

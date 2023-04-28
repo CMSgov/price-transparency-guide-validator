@@ -12,6 +12,7 @@
   "scripts": {
     "build": "del-cli out && tsc",
     "prettier": "prettier --check \"src/*.ts\"",
+    "prepare": "npm run build",
     "test": "jest --maxWorkers=4 --coverage"
   },
   "repository": {

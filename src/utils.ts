@@ -9,6 +9,12 @@ import { createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import yauzl from 'yauzl';
 
+export type ZipContents = {
+  zipFile: yauzl.ZipFile;
+  jsonEntries: yauzl.Entry[];
+  dataPath: string;
+};
+
 export const config = {
   AVAILABLE_SCHEMAS: [
     'allowed-amounts',
@@ -177,7 +183,7 @@ export async function checkDataUrl(url: string) {
   }
 }
 
-export async function downloadDataFile(url: string, folder: string): Promise<string> {
+export async function downloadDataFile(url: string, folder: string): Promise<string | ZipContents> {
   const filenameGuess = 'data.json';
   const dataPath = path.join(folder, filenameGuess);
   return new Promise((resolve, reject) => {
@@ -232,24 +238,24 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
                   let chosenEntry: yauzl.Entry;
                   if (jsonEntries.length === 1) {
                     chosenEntry = jsonEntries[0];
+                    zipFile.openReadStream(chosenEntry, (err, readStream) => {
+                      const outputStream = fs.createWriteStream(dataPath);
+                      outputStream.on('finish', () => {
+                        zipFile.close();
+                        resolve(dataPath);
+                      });
+                      outputStream.on('error', () => {
+                        zipFile.close();
+                        reject('Error writing downloaded file.');
+                      });
+                      readStream.pipe(outputStream);
+                    });
                   } else {
                     jsonEntries.sort((a, b) => {
                       return a.fileName.localeCompare(b.fileName);
                     });
-                    chosenEntry = chooseJsonFile(jsonEntries);
+                    resolve({ zipFile, jsonEntries, dataPath });
                   }
-                  zipFile.openReadStream(chosenEntry, (err, readStream) => {
-                    const outputStream = fs.createWriteStream(dataPath);
-                    outputStream.on('finish', () => {
-                      zipFile.close();
-                      resolve(dataPath);
-                    });
-                    outputStream.on('error', () => {
-                      zipFile.close();
-                      reject('Error writing downloaded file.');
-                    });
-                    readStream.pipe(outputStream);
-                  });
                 }
               });
               zipFile.readEntry();
@@ -278,6 +284,31 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
   });
 }
 
+export async function getEntryFromZip(
+  zipFile: yauzl.ZipFile,
+  entry: yauzl.Entry,
+  dataPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    zipFile.openReadStream(entry, (err, readStream) => {
+      if (err) {
+        reject(err);
+      } else {
+        const outputStream = fs.createWriteStream(dataPath);
+        outputStream.on('finish', () => {
+          // keep the zipFile open for now, in case we want more entries
+          resolve();
+        });
+        outputStream.on('error', () => {
+          zipFile.close();
+          reject('Error writing chosen file.');
+        });
+        readStream.pipe(outputStream);
+      }
+    });
+  });
+}
+
 function isGzip(contentType: string, url: string): boolean {
   return (
     contentType === 'application/gzip' ||
@@ -293,7 +324,7 @@ function isZip(contentType: string, url: string): boolean {
   );
 }
 
-function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
+export function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
   // there might be a lot of entries. show ten per page of results
   console.log(`${entries.length} JSON files found within ZIP archive.`);
   const maxPage = Math.floor((entries.length - 1) / 10);
