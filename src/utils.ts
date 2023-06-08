@@ -108,6 +108,7 @@ export function buildRunCommand(
   let outputDir, outputFile;
   if (outputPath?.length > 0) {
     const absoluteOutputPath = path.resolve(outputPath);
+    fs.createFileSync(absoluteOutputPath);
     outputDir = path.dirname(absoluteOutputPath);
     outputFile = path.basename(absoluteOutputPath);
   }
@@ -118,7 +119,11 @@ export function buildRunCommand(
   }
 }
 
-export async function runContainer(schemaPath: string, dataPath: string, outputPath: string) {
+export async function runContainer(
+  schemaPath: string,
+  dataPath: string,
+  outputPath: string
+): Promise<boolean> {
   try {
     const containerId = await util
       .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
@@ -134,19 +139,23 @@ export async function runContainer(schemaPath: string, dataPath: string, outputP
         .promisify(exec)(runCommand)
         .then(result => {
           console.log(result.stdout);
+          return true;
         })
         .catch(reason => {
           console.log(reason.stdout);
           console.log(reason.stderr);
           process.exitCode = 1;
+          return false;
         });
     } else {
       console.log('Could not find a validator docker container.');
       process.exitCode = 1;
+      return false;
     }
   } catch (error) {
     console.log(`Error when running validator container: ${error}`);
     process.exitCode = 1;
+    return false;
   }
 }
 
@@ -388,4 +397,42 @@ function showMenuOptions(currentPage: number, maxPage: number, items: string[]) 
     commandsToShow.push('"(g)o X" to jump to a page');
   }
   console.log(commandsToShow.join(' | '));
+}
+
+export function appendResults(source: string, destination: string, prefixData: string = '') {
+  try {
+    const sourceData = fs.readFileSync(source);
+    fs.appendFileSync(destination, `${prefixData}${sourceData}`);
+  } catch (err) {
+    console.log('Problem copying results to output file', err);
+  }
+}
+
+export async function validateSingleFileFromUrl(
+  dataUrl: string,
+  schemaVersion: string,
+  schemaName: string,
+  strict: boolean,
+  outputPath: string
+) {
+  try {
+    if (await checkDataUrl(dataUrl)) {
+      await useRepoVersion(schemaVersion, schemaName, strict).then(async schemaPath => {
+        if (schemaPath != null) {
+          console.log(`File: ${dataUrl}`);
+          const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+          if (typeof dataPath === 'string') {
+            const containedResult = await runContainer(schemaPath, dataPath, outputPath);
+            if (!containedResult) {
+              process.exitCode = 1;
+            }
+          }
+        } else {
+          console.log('No schema available - not validating.');
+        }
+      });
+    }
+  } catch (err) {
+    console.log('Problem validating single downloaded file', err);
+  }
 }

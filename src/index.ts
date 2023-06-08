@@ -47,7 +47,15 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
-    .action(validateFromUrl);
+    .action((dataUrl, schemaVersion, options) => {
+      validateFromUrl(dataUrl, schemaVersion, options).then(result => {
+        if (result) {
+          process.exitCode = 0;
+        } else {
+          process.exitCode = 1;
+        }
+      });
+    });
 
   program
     .command('update')
