@@ -20,32 +20,13 @@ describe('utils', () => {
   });
 
   describe('#buildRunCommand', () => {
-    it('should build the command to run the validation container without an output path', () => {
-      const result = validatorUtils.buildRunCommand(
-        SEP + path.join('some', 'useful', 'schema.json'), // this is an absolute path
-        path.join('my', 'data.json'), // this is a relative path
-        '',
-        'bad1dea'
-      );
-      // since the container is running linux, it should always use / as its path separator.
-      // but, the paths on the host system should be built by path
-      const expectedCommand = `docker run --rm -v "${path.join(
-        path.resolve(SEP),
-        'some',
-        'useful'
-      )}":/schema/ -v "${path.join(
-        PROJECT_DIR,
-        'my'
-      )}":/data/ bad1dea "schema/schema.json" "data/data.json"`;
-      expect(result).toBe(expectedCommand);
-    });
-
     it('should build the command to run the validation container with an output path', () => {
       const result = validatorUtils.buildRunCommand(
         path.join('some', 'useful', 'schema.json'), // this is a relative path
         SEP + path.join('other', 'data', 'data.json'), // this is an absolute path
-        path.join('results', 'output.txt'), // this is a relative path
-        'dadb0d'
+        path.join('results', 'output'), // this is a relative path
+        'dadb0d',
+        'table-of-contents'
       );
       const expectedCommand = `docker run --rm -v "${path.join(
         PROJECT_DIR,
@@ -53,8 +34,9 @@ describe('utils', () => {
         'useful'
       )}":/schema/ -v "${path.join(path.resolve(SEP), 'other', 'data')}":/data/ -v "${path.join(
         PROJECT_DIR,
-        'results'
-      )}":/output/ dadb0d "schema/schema.json" "data/data.json" -o "output/output.txt"`;
+        'results',
+        'output'
+      )}":/output/ dadb0d "schema/schema.json" "data/data.json" -o "output/" -s table-of-contents`;
       expect(result).toBe(expectedCommand);
     });
   });

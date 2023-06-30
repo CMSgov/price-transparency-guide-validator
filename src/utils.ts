@@ -93,8 +93,9 @@ function makeSchemaStrict(schema: any) {
 export function buildRunCommand(
   schemaPath: string,
   dataPath: string,
-  outputPath: string,
-  containerId: string
+  outputDir: string,
+  containerId: string,
+  schemaName: string
 ): string {
   // figure out mount for schema file
   const absoluteSchemaPath = path.resolve(schemaPath);
@@ -104,26 +105,26 @@ export function buildRunCommand(
   const absoluteDataPath = path.resolve(dataPath);
   const dataDir = path.dirname(absoluteDataPath);
   const dataFile = path.basename(absoluteDataPath);
-  // figure out mount for output file, if provided
-  let outputDir, outputFile;
-  if (outputPath?.length > 0) {
-    const absoluteOutputPath = path.resolve(outputPath);
-    fs.createFileSync(absoluteOutputPath);
-    outputDir = path.dirname(absoluteOutputPath);
-    outputFile = path.basename(absoluteOutputPath);
-  }
-  if (outputDir && outputFile) {
-    return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${outputDir}":/output/ ${containerId} "schema/${schemaFile}" "data/${dataFile}" -o "output/${outputFile}"`;
-  } else {
-    return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${containerId} "schema/${schemaFile}" "data/${dataFile}"`;
-  }
+  return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${path.resolve(
+    outputDir
+  )}":/output/ ${containerId} "schema/${schemaFile}" "data/${dataFile}" -o "output/" -s ${schemaName}`;
 }
+
+type ContainerResult = {
+  pass: boolean;
+  locations?: {
+    inNetwork?: string[];
+    allowedAmount?: string[];
+    providerReference?: string[];
+  };
+};
 
 export async function runContainer(
   schemaPath: string,
+  schemaName: string,
   dataPath: string,
   outputPath: string
-): Promise<boolean> {
+): Promise<ContainerResult> {
   try {
     const containerId = await util
       .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
@@ -133,29 +134,55 @@ export async function runContainer(
         return '';
       });
     if (containerId.length > 0) {
-      const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, containerId);
+      // make temp dir for output
+      const outputDir = temp.mkdirSync('output');
+      // copy output files after it finishes
+      const runCommand = buildRunCommand(schemaPath, dataPath, outputDir, containerId, schemaName);
       console.log('Running validator container...');
       return util
         .promisify(exec)(runCommand)
         .then(result => {
-          console.log(result.stdout);
-          return true;
+          const containerResult: ContainerResult = { pass: true };
+          const containerOutputPath = path.join(outputDir, 'output.txt');
+          const containerLocationPath = path.join(outputDir, 'locations.json');
+          if (outputPath && fs.existsSync(containerOutputPath)) {
+            fs.copySync(containerOutputPath, outputPath);
+          }
+          if (fs.existsSync(containerOutputPath)) {
+            if (outputPath) {
+              fs.copySync(containerOutputPath, outputPath);
+            } else {
+              const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
+              console.log(outputText);
+            }
+          }
+          if (fs.existsSync(containerLocationPath)) {
+            try {
+              containerResult.locations = fs.readJsonSync(containerLocationPath);
+            } catch (err) {
+              // something went wrong when reading the location file that the validator produced
+            }
+          }
+          return containerResult;
         })
         .catch(reason => {
+          if (outputPath && fs.existsSync(path.join(outputDir, 'output.txt'))) {
+            fs.copySync(path.join(outputDir, 'output.txt'), outputPath);
+          }
           console.log(reason.stdout);
           console.log(reason.stderr);
           process.exitCode = 1;
-          return false;
+          return { pass: false };
         });
     } else {
       console.log('Could not find a validator docker container.');
       process.exitCode = 1;
-      return false;
+      return { pass: false };
     }
   } catch (error) {
     console.log(`Error when running validator container: ${error}`);
     process.exitCode = 1;
-    return false;
+    return { pass: false };
   }
 }
 
@@ -181,12 +208,12 @@ export async function checkDataUrl(url: string) {
       return proceedToDownload;
     } else {
       console.log(
-        `Received unsuccessful status code ${response.status} when checking data file URL.`
+        `Received unsuccessful status code ${response.status} when checking data file URL: ${url}`
       );
       return false;
     }
   } catch (e) {
-    console.log('Request failed when checking data file URL.');
+    console.log(`Request failed when checking data file URL: ${url}`);
     console.log(e.message);
     return false;
   }
@@ -422,7 +449,12 @@ export async function validateSingleFileFromUrl(
           console.log(`File: ${dataUrl}`);
           const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
           if (typeof dataPath === 'string') {
-            const containedResult = await runContainer(schemaPath, dataPath, outputPath);
+            const containedResult = await runContainer(
+              schemaPath,
+              schemaName,
+              dataPath,
+              outputPath
+            );
             if (!containedResult) {
               process.exitCode = 1;
             }

@@ -2,15 +2,24 @@ import 'jest-extended';
 import path from 'path';
 import * as validatorUtils from '../src/utils';
 import { validate, validateFromUrl } from '../src/commands';
+import { SchemaManager } from '../src/SchemaManager';
 
 describe('commands', () => {
   describe('#validate', () => {
     let useRepoSpy: jest.SpyInstance;
+    let useVersionSpy: jest.SpyInstance;
+    let useSchemaSpy: jest.SpyInstance;
     let runContainerSpy: jest.SpyInstance;
 
     beforeAll(() => {
       useRepoSpy = jest.spyOn(validatorUtils, 'useRepoVersion').mockResolvedValue(undefined);
-      runContainerSpy = jest.spyOn(validatorUtils, 'runContainer').mockResolvedValue(undefined);
+      useVersionSpy = jest.spyOn(SchemaManager.prototype, 'useVersion').mockResolvedValue(true);
+      useSchemaSpy = jest
+        .spyOn(SchemaManager.prototype, 'useSchema')
+        .mockResolvedValue('schemaPath');
+      runContainerSpy = jest
+        .spyOn(validatorUtils, 'runContainer')
+        .mockResolvedValue({ pass: false });
     });
 
     beforeEach(() => {
@@ -24,7 +33,7 @@ describe('commands', () => {
         'schema version 278',
         { target: null }
       );
-      expect(useRepoSpy).toHaveBeenCalledTimes(1);
+      expect(useVersionSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should not continue processing when the data file does not exist', async () => {
@@ -73,7 +82,9 @@ describe('commands', () => {
       downloadDataSpy = jest
         .spyOn(validatorUtils, 'downloadDataFile')
         .mockResolvedValue('data.json');
-      runContainerSpy = jest.spyOn(validatorUtils, 'runContainer').mockResolvedValue(undefined);
+      runContainerSpy = jest
+        .spyOn(validatorUtils, 'runContainer')
+        .mockResolvedValue({ pass: false });
     });
 
     beforeEach(() => {
@@ -99,14 +110,21 @@ describe('commands', () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
       useRepoSpy.mockResolvedValueOnce('schemapath.json');
       downloadDataSpy.mockResolvedValueOnce('data.json');
-      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
+      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {
+        target: 'in-network-rates'
+      });
       expect(downloadDataSpy).toHaveBeenCalledTimes(1);
       expect(downloadDataSpy).toHaveBeenCalledWith(
         'http://example.org/data.json',
         expect.any(String)
       );
       expect(runContainerSpy).toHaveBeenCalledTimes(1);
-      expect(runContainerSpy).toHaveBeenCalledWith('schemapath.json', 'data.json', undefined);
+      expect(runContainerSpy).toHaveBeenCalledWith(
+        'schemapath.json',
+        'in-network-rates',
+        'data.json',
+        undefined
+      );
     });
 
     it('should not download the data file when the requested schema is not available', async () => {
