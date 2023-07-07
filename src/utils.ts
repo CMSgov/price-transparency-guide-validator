@@ -313,14 +313,14 @@ function isGzip(contentType: string, url: string): boolean {
   return (
     contentType === 'application/gzip' ||
     contentType === 'application/x-gzip' ||
-    (contentType === 'application/octet-stream' && url.endsWith('.gz'))
+    (contentType === 'application/octet-stream' && /\.gz(\?|$)/.test(url))
   );
 }
 
 function isZip(contentType: string, url: string): boolean {
   return (
     contentType === 'application/zip' ||
-    (contentType === 'application/octet-stream' && url.endsWith('.zip'))
+    (contentType === 'application/octet-stream' && /\.zip(\?|$)/.test(url))
   );
 }
 
