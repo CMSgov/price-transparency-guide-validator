@@ -3,16 +3,19 @@ on:
   release:
     types: [published]
 jobs:
-  build:
+  build-and-test:
+    uses: ./.github/workflows/main.yml # test-run workflow
+  publish-npm:
+    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-      - uses: ./.github/workflows/main.yml # test-run workflow
       - uses: actions/checkout@v3
       # Setup .npmrc file to publish to npm
       - uses: actions/setup-node@v3
         with:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_KEY }}
