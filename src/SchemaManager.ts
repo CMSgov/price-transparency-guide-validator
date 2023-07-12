@@ -8,6 +8,7 @@ import temp from 'temp';
 export class SchemaManager {
   private version: string;
   private storageDirectory: string;
+  public strict: boolean;
 
   constructor(
     private repoDirectory = config.SCHEMA_REPO_FOLDER,
@@ -49,10 +50,10 @@ export class SchemaManager {
     }
   }
 
-  async useSchema(schemaName: string, strict = false): Promise<string> {
+  async useSchema(schemaName: string): Promise<string> {
     const schemaPath = path.join(
       this.storageDirectory,
-      `${schemaName}-${this.version}-${strict ? 'strict' : 'loose'}.json`
+      `${schemaName}-${this.version}-${this.strict ? 'strict' : 'loose'}.json`
     );
     if (fs.existsSync(schemaPath)) {
       return schemaPath;
@@ -61,7 +62,7 @@ export class SchemaManager {
       path.join(this.repoDirectory, 'schemas', schemaName, `${schemaName}.json`),
       'utf-8'
     );
-    if (strict) {
+    if (this.strict) {
       const modifiedSchema = JSON.parse(schemaContents);
       makeSchemaStrict(modifiedSchema);
       schemaContents = JSON.stringify(modifiedSchema);

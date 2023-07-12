@@ -8,6 +8,9 @@ import temp from 'temp';
 import { createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import yauzl from 'yauzl';
+import { EOL } from 'os';
+import { DockerManager } from './DockerManager';
+import { SchemaManager } from './SchemaManager';
 
 export type ZipContents = {
   zipFile: yauzl.ZipFile;
@@ -135,6 +138,7 @@ export async function runContainer(
       });
     if (containerId.length > 0) {
       // make temp dir for output
+      temp.track();
       const outputDir = temp.mkdirSync('output');
       // copy output files after it finishes
       const runCommand = buildRunCommand(schemaPath, dataPath, outputDir, containerId, schemaName);
@@ -435,36 +439,195 @@ export function appendResults(source: string, destination: string, prefixData: s
   }
 }
 
-export async function validateSingleFileFromUrl(
-  dataUrl: string,
-  schemaVersion: string,
-  schemaName: string,
-  strict: boolean,
+export async function assessTocContents(
+  locations: ContainerResult['locations'],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+): Promise<string[]> {
+  const totalFileCount =
+    (locations?.inNetwork?.length ?? 0) + (locations?.allowedAmount?.length ?? 0);
+  const fileText = totalFileCount === 1 ? 'this file' : 'these files';
+  if (totalFileCount > 0) {
+    console.log(`Table of contents refers to ${fileText}:`);
+    if (locations.inNetwork?.length > 0) {
+      console.log('== In-Network Rates ==');
+      locations.inNetwork.forEach(inf => console.log(`* ${inf}`));
+    }
+    if (locations.allowedAmount?.length > 0) {
+      console.log('== Allowed Amounts ==');
+      locations.allowedAmount.forEach(aaf => console.log(`* ${aaf}`));
+    }
+    const wantToValidateContents = readlineSync.keyInYNStrict(
+      `Would you like to validate ${fileText}?`
+    );
+    if (wantToValidateContents) {
+      const providerReferences = await validateTocContents(
+        locations.inNetwork ?? [],
+        locations.allowedAmount ?? [],
+        schemaManager,
+        dockerManager,
+        outputPath
+      );
+      return providerReferences;
+    }
+  }
+  return [];
+}
+
+export async function validateTocContents(
+  inNetwork: string[],
+  allowedAmount: string[],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+): Promise<string[]> {
+  temp.track();
+  let tempOutput = '';
+  if (outputPath?.length > 0) {
+    tempOutput = path.join(temp.mkdirSync('contents'), 'contained-result');
+  }
+  const providerReferences: Set<string> = new Set<string>();
+  if (inNetwork.length > 0) {
+    await schemaManager.useSchema('in-network-rates').then(async schemaPath => {
+      if (schemaPath != null) {
+        for (const dataUrl of inNetwork) {
+          try {
+            if (await checkDataUrl(dataUrl)) {
+              console.log(`File: ${dataUrl}`);
+              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              if (typeof dataPath === 'string') {
+                const containedResult = await dockerManager.runContainer(
+                  schemaPath,
+                  'in-network-rates',
+                  dataPath,
+                  tempOutput
+                );
+                if (
+                  containedResult.pass &&
+                  containedResult.locations?.providerReference?.length > 0
+                ) {
+                  containedResult.locations.providerReference.forEach(prf =>
+                    providerReferences.add(prf)
+                  );
+                }
+                if (tempOutput.length > 0) {
+                  appendResults(tempOutput, outputPath, `${dataUrl} - in-network${EOL}`);
+                }
+              }
+            } else {
+              console.log(`Could not download file: ${dataUrl}`);
+            }
+          } catch (err) {
+            console.log('Problem validating referenced in-network file', err);
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+      }
+    });
+  }
+  if (allowedAmount.length > 0) {
+    await schemaManager.useSchema('allowed-amounts').then(async schemaPath => {
+      if (schemaPath != null) {
+        for (const dataUrl of allowedAmount) {
+          try {
+            if (await checkDataUrl(dataUrl)) {
+              console.log(`File: ${dataUrl}`);
+              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              if (typeof dataPath === 'string') {
+                const containedResult = await dockerManager.runContainer(
+                  schemaPath,
+                  'allowed-amounts',
+                  dataPath,
+                  tempOutput
+                );
+                if (tempOutput.length > 0) {
+                  appendResults(tempOutput, outputPath, `${dataUrl} - allowed-amounts${EOL}`);
+                }
+              }
+            } else {
+              console.log(`Could not download file: ${dataUrl}`);
+            }
+          } catch (err) {
+            console.log('Problem validating referenced allowed-amounts file', err);
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+      }
+    });
+  }
+  return [...providerReferences.values()];
+}
+
+export async function assessReferencedProviders(
+  providerReferences: string[],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
   outputPath: string
 ) {
-  try {
-    if (await checkDataUrl(dataUrl)) {
-      await useRepoVersion(schemaVersion, schemaName, strict).then(async schemaPath => {
-        if (schemaPath != null) {
-          console.log(`File: ${dataUrl}`);
-          const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
-          if (typeof dataPath === 'string') {
-            const containedResult = await runContainer(
-              schemaPath,
-              schemaName,
-              dataPath,
-              outputPath
-            );
-            if (!containedResult) {
-              process.exitCode = 1;
-            }
-          }
-        } else {
-          console.log('No schema available - not validating.');
-        }
-      });
+  if (providerReferences.length > 0) {
+    const fileText = providerReferences.length === 1 ? 'this file' : 'these files';
+    if (providerReferences.length === 1) {
+      console.log(`In-network file(s) refer to ${fileText}:`);
+      console.log('== Provider Reference ==');
+      providerReferences.forEach(prf => console.log(`* ${prf}`));
+      const wantToValidateProviders = readlineSync.keyInYNStrict(
+        `Would you like to validate ${fileText}?`
+      );
+      if (wantToValidateProviders) {
+        await validateReferencedProviders(
+          providerReferences,
+          schemaManager,
+          dockerManager,
+          outputPath
+        );
+      }
     }
-  } catch (err) {
-    console.log('Problem validating single downloaded file', err);
+  }
+}
+
+export async function validateReferencedProviders(
+  providerReferences: string[],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+) {
+  temp.track();
+  let tempOutput = '';
+  if (outputPath?.length > 0) {
+    tempOutput = path.join(temp.mkdirSync('providers'), 'contained-result');
+  }
+  if (providerReferences.length > 0) {
+    schemaManager.useSchema('provider-reference').then(async schemaPath => {
+      if (schemaPath != null) {
+        for (const dataUrl of providerReferences) {
+          try {
+            if (await checkDataUrl(dataUrl)) {
+              console.log(`File: ${dataUrl}`);
+              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              if (typeof dataPath === 'string') {
+                const containedResult = await dockerManager.runContainer(
+                  schemaPath,
+                  'provider-reference',
+                  dataPath,
+                  tempOutput
+                );
+                if (tempOutput.length > 0) {
+                  appendResults(tempOutput, outputPath, `${dataUrl} - provider-reference${EOL}`);
+                }
+              }
+            } else {
+              console.log(`Could not download file: ${dataUrl}`);
+            }
+          } catch (err) {
+            console.log('Problem validating referenced provider-reference file', err);
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+      }
+    });
   }
 }

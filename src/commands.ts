@@ -8,18 +8,17 @@ import { EOL } from 'os';
 
 import {
   config,
-  runContainer,
-  useRepoVersion,
   downloadDataFile,
   checkDataUrl,
   chooseJsonFile,
   getEntryFromZip,
-  appendResults,
-  validateSingleFileFromUrl
+  assessTocContents,
+  assessReferencedProviders
 } from './utils';
 import temp from 'temp';
 import crypto from 'crypto';
 import { SchemaManager } from './SchemaManager';
+import { DockerManager } from './DockerManager';
 
 crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION;
 
@@ -32,86 +31,55 @@ export async function validate(dataFile: string, schemaVersion: string, options:
   }
   const schemaManager = new SchemaManager();
   await schemaManager.ensureRepo();
+  schemaManager.strict = options.strict;
   return schemaManager
     .useVersion(schemaVersion)
     .then(versionIsAvailable => {
       if (versionIsAvailable) {
-        return schemaManager.useSchema(options.target, options.strict);
+        return schemaManager.useSchema(options.target);
       }
     })
     .then(async schemaPath => {
+      temp.track();
       if (schemaPath != null) {
-        const containerResult = await runContainer(
+        const dockerManager = new DockerManager();
+        const containerResult = await dockerManager.runContainer(
           schemaPath,
           options.target,
           dataFile,
           options.out
         );
-        // change this implementation so that we can handle different referenced thigns
         if (containerResult.pass) {
           if (options.target === 'table-of-contents') {
-            const totalFileCount =
-              (containerResult.locations?.inNetwork?.length ?? 0) +
-              (containerResult.locations?.allowedAmount?.length ?? 0);
-            const fileText = totalFileCount === 1 ? 'this file' : 'these files';
-            if (totalFileCount > 0) {
-              console.log(`Table of contents refers to ${fileText}:`);
-              if (containerResult.locations.inNetwork?.length > 0) {
-                console.log('== In-Network Rates ==');
-                containerResult.locations.inNetwork.forEach(inf => console.log(`* ${inf}`));
-              }
-              if (containerResult.locations.allowedAmount?.length > 0) {
-                console.log('== Allowed Amounts ==');
-                containerResult.locations.allowedAmount.forEach(aaf => console.log(`* ${aaf}`));
-              }
-              const wantToValidateContents = readlineSync.keyInYNStrict(
-                `Would you like to validate ${fileText}?`
-              );
-              if (wantToValidateContents) {
-                // here's where the good stuff can happen
-                // if an output file is specified, write to a temp file, then copy to the actual file we're using
-                let tempOutput = '';
-                if (options.out?.length > 0) {
-                  tempOutput = path.join(temp.mkdirSync('referenced'), 'contained-result');
-                }
-                temp.track();
-                for (const dataUrl of containerResult.locations.inNetwork ?? []) {
-                  await validateSingleFileFromUrl(
-                    dataUrl,
-                    schemaVersion,
-                    'in-network-rates',
-                    options.strict,
-                    tempOutput
-                  );
-                  if (tempOutput.length > 0) {
-                    appendResults(tempOutput, options.out, `${dataUrl} - in-network${EOL}`);
-                  }
-                }
-                for (const dataUrl of containerResult.locations.allowedAmount ?? []) {
-                  await validateSingleFileFromUrl(
-                    dataUrl,
-                    schemaVersion,
-                    'allowed-amounts',
-                    options.strict,
-                    tempOutput
-                  );
-                  if (tempOutput.length > 0) {
-                    appendResults(tempOutput, options.out, `${dataUrl} - allowed amounts${EOL}`);
-                  }
-                }
-                temp.cleanupSync();
-              }
-            }
+            const providerReferences = await assessTocContents(
+              containerResult.locations,
+              schemaManager,
+              dockerManager,
+              options.out
+            );
+            await assessReferencedProviders(
+              providerReferences,
+              schemaManager,
+              dockerManager,
+              options.out
+            );
           } else if (
             options.target === 'in-network-rates' &&
             containerResult.locations?.providerReference?.length > 0
           ) {
+            await assessReferencedProviders(
+              containerResult.locations.providerReference,
+              schemaManager,
+              dockerManager,
+              options.out
+            );
           }
         }
       } else {
         console.log('No schema available - not validating.');
         process.exitCode = 1;
       }
+      temp.cleanupSync();
     });
 }
 
@@ -121,39 +89,81 @@ export async function validateFromUrl(
   options: OptionValues
 ) {
   temp.track();
-  try {
-    if (await checkDataUrl(dataUrl)) {
-      return useRepoVersion(schemaVersion, options.target, options.strict).then(
-        async schemaPath => {
-          if (schemaPath != null) {
-            const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
-            if (typeof dataFile === 'string') {
-              return await runContainer(schemaPath, options.target, dataFile, options.out);
-            } else {
-              let continuation = true;
-              // we have multiple files, so let's choose as many as we want
-              while (continuation === true) {
-                const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
-                await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
-                await runContainer(schemaPath, options.target, dataFile.dataPath, options.out);
-                continuation = readlineSync.keyInYNStrict(
-                  'Would you like to validate another file in the ZIP?'
+  if (await checkDataUrl(dataUrl)) {
+    const schemaManager = new SchemaManager();
+    await schemaManager.ensureRepo();
+    schemaManager.strict = options.strict;
+    return schemaManager
+      .useVersion(schemaVersion)
+      .then(versionIsAvailable => {
+        if (versionIsAvailable) {
+          return schemaManager.useSchema(options.target);
+        }
+      })
+      .then(async schemaPath => {
+        if (schemaPath != null) {
+          const dockerManager = new DockerManager();
+          const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
+          if (typeof dataFile === 'string') {
+            const containerResult = await dockerManager.runContainer(
+              schemaPath,
+              options.target,
+              dataFile,
+              options.out
+            );
+            if (containerResult.pass) {
+              if (options.target === 'table-of-contents') {
+                const providerReferences = await assessTocContents(
+                  containerResult.locations,
+                  schemaManager,
+                  dockerManager,
+                  options.out
+                );
+                await assessReferencedProviders(
+                  providerReferences,
+                  schemaManager,
+                  dockerManager,
+                  options.out
+                );
+              } else if (
+                options.target === 'in-network-rates' &&
+                containerResult.locations?.providerReference?.length > 0
+              ) {
+                await assessReferencedProviders(
+                  containerResult.locations.providerReference,
+                  schemaManager,
+                  dockerManager,
+                  options.out
                 );
               }
-              dataFile.zipFile.close();
             }
+            return containerResult;
           } else {
-            console.log('No schema available - not validating.');
-            process.exitCode = 1;
+            let continuation = true;
+            // we have multiple files, so let's choose as many as we want
+            while (continuation === true) {
+              const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
+              await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
+              await dockerManager.runContainer(
+                schemaPath,
+                options.target,
+                dataFile.dataPath,
+                options.out
+              );
+              continuation = readlineSync.keyInYNStrict(
+                'Would you like to validate another file in the ZIP?'
+              );
+            }
+            dataFile.zipFile.close();
           }
+        } else {
+          console.log('No schema available - not validating.');
+          process.exitCode = 1;
         }
-      );
-    } else {
-      console.log('Exiting.');
-      process.exitCode = 1;
-    }
-  } finally {
-    temp.cleanupSync();
+      });
+  } else {
+    console.log('Exiting.');
+    process.exitCode = 1;
   }
 }
 
