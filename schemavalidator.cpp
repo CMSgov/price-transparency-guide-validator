@@ -250,6 +250,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     {
       objectPath.pop_back();
     }
+    lastKey = "";
     return BaseReaderHandler::EndObject(len);
   }
 
