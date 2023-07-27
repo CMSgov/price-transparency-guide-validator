@@ -58,10 +58,11 @@ export class SchemaManager {
     if (fs.existsSync(schemaPath)) {
       return schemaPath;
     }
-    let schemaContents = fs.readFileSync(
-      path.join(this.repoDirectory, 'schemas', schemaName, `${schemaName}.json`),
-      'utf-8'
-    );
+    const contentPath = path.join(this.repoDirectory, 'schemas', schemaName, `${schemaName}.json`);
+    if (!fs.existsSync(contentPath)) {
+      return null;
+    }
+    let schemaContents = fs.readFileSync(contentPath, 'utf-8');
     if (this.strict) {
       const modifiedSchema = JSON.parse(schemaContents);
       makeSchemaStrict(modifiedSchema);

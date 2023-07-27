@@ -4,7 +4,6 @@ import { exec } from 'child_process';
 import fs from 'fs-extra';
 import readlineSync from 'readline-sync';
 import { OptionValues } from 'commander';
-import { EOL } from 'os';
 
 import {
   config,
@@ -16,11 +15,8 @@ import {
   assessReferencedProviders
 } from './utils';
 import temp from 'temp';
-import crypto from 'crypto';
 import { SchemaManager } from './SchemaManager';
 import { DockerManager } from './DockerManager';
-
-crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION;
 
 export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
   // check to see if supplied json file exists
@@ -42,7 +38,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
     .then(async schemaPath => {
       temp.track();
       if (schemaPath != null) {
-        const dockerManager = new DockerManager();
+        const dockerManager = new DockerManager(options.debug);
         const containerResult = await dockerManager.runContainer(
           schemaPath,
           options.target,
@@ -102,7 +98,7 @@ export async function validateFromUrl(
       })
       .then(async schemaPath => {
         if (schemaPath != null) {
-          const dockerManager = new DockerManager();
+          const dockerManager = new DockerManager(options.debug);
           const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
           if (typeof dataFile === 'string') {
             const containerResult = await dockerManager.runContainer(

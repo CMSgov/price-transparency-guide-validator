@@ -12,6 +12,13 @@ async function main() {
   program
     .name('cms-mrf-validator')
     .description('Tool for validating health coverage machine-readable files.')
+    .option('-d, --debug', 'show debug output')
+    .hook('preAction', (thisCommand, actionCommand) => {
+      if (thisCommand.opts().debug) {
+        console.log(process.argv.join(' '));
+        actionCommand.setOptionValue('debug', true);
+      }
+    })
     .command('validate')
     .description('Validate a file against a specific published version of a CMS schema.')
     .usage('<data-file> <schema-version> [options]')

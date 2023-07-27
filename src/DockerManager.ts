@@ -5,6 +5,20 @@ import fs from 'fs-extra';
 import temp from 'temp';
 
 export class DockerManager {
+  containerId = '';
+
+  constructor(public debug = false) {}
+
+  private async initContainerId(): Promise<void> {
+    this.containerId = await util
+      .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
+      .then(result => result.stdout.trim())
+      .catch(reason => {
+        console.log(reason.stderr);
+        return '';
+      });
+  }
+
   async runContainer(
     schemaPath: string,
     schemaName: string,
@@ -12,28 +26,21 @@ export class DockerManager {
     outputPath: string
   ): Promise<ContainerResult> {
     try {
-      const containerId = await util
-        .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
-        .then(result => result.stdout.trim())
-        .catch(reason => {
-          console.log(reason.stderr);
-          return '';
-        });
-      if (containerId.length > 0) {
+      if (this.containerId.length === 0) {
+        await this.initContainerId();
+      }
+      if (this.containerId.length > 0) {
         // make temp dir for output
         temp.track();
         const outputDir = temp.mkdirSync('output');
         const containerOutputPath = path.join(outputDir, 'output.txt');
         const containerLocationPath = path.join(outputDir, 'locations.json');
         // copy output files after it finishes
-        const runCommand = this.buildRunCommand(
-          schemaPath,
-          dataPath,
-          outputDir,
-          containerId,
-          schemaName
-        );
+        const runCommand = this.buildRunCommand(schemaPath, dataPath, outputDir, schemaName);
         console.log('Running validator container...');
+        if (this.debug) {
+          console.log(runCommand);
+        }
         return util
           .promisify(exec)(runCommand)
           .then(result => {
@@ -89,7 +96,6 @@ export class DockerManager {
     schemaPath: string,
     dataPath: string,
     outputDir: string,
-    containerId: string,
     schemaName: string
   ): string {
     // figure out mount for schema file
@@ -102,7 +108,9 @@ export class DockerManager {
     const dataFile = path.basename(absoluteDataPath);
     return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${path.resolve(
       outputDir
-    )}":/output/ ${containerId} "schema/${schemaFile}" "data/${dataFile}" -o "output/" -s ${schemaName}`;
+    )}":/output/ ${
+      this.containerId
+    } "schema/${schemaFile}" "data/${dataFile}" -o "output/" -s ${schemaName}`;
   }
 }
 
