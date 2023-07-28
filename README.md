@@ -65,10 +65,12 @@ cms-mrf-validator help
 Tool for validating health coverage machine-readable files.
 
 Options:
+  -d, --debug                                      show debug output
   -h, --help                                       display help for command
 
 Commands:
   validate [options] <data-file> <schema-version>  Validate a file against a specific published version of a CMS schema.
+  from-url [options] <data-url> <schema-version>   Validate the file retrieved from a URL against a specific published version of a CMS schema.
   update                                           Update the available schemas from the CMS repository.
   help [command]                                   display help for command
 ```
