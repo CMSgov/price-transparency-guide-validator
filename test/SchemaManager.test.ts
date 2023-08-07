@@ -2,11 +2,13 @@ import 'jest-extended';
 import path from 'path';
 import temp from 'temp';
 import util from 'util';
-import { exec } from 'child_process';
+import child_process from 'child_process';
 import { ensureDirSync, readFileSync, writeFileSync } from 'fs-extra';
 import { SchemaManager } from '../src/SchemaManager';
 
-const execP = util.promisify(exec);
+jest.mock('child_process');
+const child_process_real = jest.requireActual('child_process');
+const execP = util.promisify(child_process_real.exec);
 
 describe('SchemaManager', () => {
   let repoDirectory: string;
@@ -39,8 +41,62 @@ describe('SchemaManager', () => {
     await execP(`git -C "${repoDirectory}" tag -a "v1.0" -m ""`);
   });
 
-  describe('#ensureRepo', () => {});
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  describe('#ensureRepo', () => {
+    let mockedExec: jest.Mock;
+
+    beforeAll(() => {
+      mockedExec = child_process.exec as jest.Mocked<typeof child_process_real.mock>;
+    });
+
+    it('should not clone anything when the repo already exists', async () => {
+      const manager = new SchemaManager();
+      await manager.ensureRepo();
+      expect(mockedExec).toHaveBeenCalledTimes(0);
+    });
+
+    it('should clone the schema repo when it does not exist', async () => {
+      // basic callback mock, since we don't need anything more complex than that for testing
+      mockedExec.mockImplementationOnce((_command: string, callback: any) => {
+        if (callback) {
+          callback(null, { stdout: 'ok' });
+        }
+      });
+      const differentFolder = temp.mkdirSync();
+      const repoUrl = 'http://very.fake.url_goes_here';
+      const manager = new SchemaManager(differentFolder, repoUrl);
+      await manager.ensureRepo();
+      expect(mockedExec).toHaveBeenCalledTimes(1);
+      expect(mockedExec).toHaveBeenCalledWith(
+        `git clone http://very.fake.url_goes_here "${differentFolder}"`,
+        expect.anything()
+      );
+    });
+  });
+
   describe('#useVersion', () => {
+    beforeEach(() => {
+      (child_process.exec as jest.Mocked<typeof child_process_real.exec>).mockImplementation(
+        (command: string, callback: any) => {
+          child_process_real.exec(
+            command,
+            (err: Error, stdout: string | Buffer, stderr: string | Buffer) => {
+              if (callback) {
+                callback(err, { stdout, stderr });
+              }
+            }
+          );
+        }
+      );
+    });
+
+    afterEach(() => {
+      (child_process.exec as jest.Mocked<typeof child_process_real.exec>).mockRestore();
+    });
+
     it('should return true when the version exists in the repo', async () => {
       const schemaManager = new SchemaManager(repoDirectory);
       const result = await schemaManager.useVersion('v0.7');
@@ -53,7 +109,27 @@ describe('SchemaManager', () => {
       expect(result).toBeFalse();
     });
   });
+
   describe('#useSchema', () => {
+    beforeEach(() => {
+      (child_process.exec as jest.Mocked<typeof child_process_real.exec>).mockImplementation(
+        (command: string, callback: any) => {
+          child_process_real.exec(
+            command,
+            (err: Error, stdout: string | Buffer, stderr: string | Buffer) => {
+              if (callback) {
+                callback(err, { stdout, stderr });
+              }
+            }
+          );
+        }
+      );
+    });
+
+    afterEach(() => {
+      (child_process.exec as jest.Mocked<typeof child_process_real.exec>).mockRestore();
+    });
+
     it('should return a path to the schema when the schema is available', async () => {
       const schemaManager = new SchemaManager(repoDirectory);
       await schemaManager.useVersion('v0.7');
