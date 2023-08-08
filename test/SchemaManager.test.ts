@@ -59,7 +59,7 @@ describe('SchemaManager', () => {
           callback(null, { stdout: 'ok' });
         }
       });
-      const manager = new SchemaManager();
+      const manager = new SchemaManager(repoDirectory);
       await manager.ensureRepo();
       expect(mockedExec).toHaveBeenCalledTimes(0);
     });
