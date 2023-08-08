@@ -11,6 +11,7 @@ import yauzl from 'yauzl';
 import { EOL } from 'os';
 import { DockerManager } from './DockerManager';
 import { SchemaManager } from './SchemaManager';
+import { logger } from './logger';
 
 export type ZipContents = {
   zipFile: yauzl.ZipFile;
@@ -69,14 +70,14 @@ export async function checkDataUrl(url: string) {
       }
       return proceedToDownload;
     } else {
-      console.log(
+      logger.error(
         `Received unsuccessful status code ${response.status} when checking data file URL: ${url}`
       );
       return false;
     }
   } catch (e) {
-    console.log(`Request failed when checking data file URL: ${url}`);
-    console.log(e.message);
+    logger.error(`Request failed when checking data file URL: ${url}`);
+    logger.error(e.message);
     return false;
   }
 }
@@ -85,7 +86,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
   const filenameGuess = 'data.json';
   const dataPath = path.join(folder, filenameGuess);
   return new Promise((resolve, reject) => {
-    console.log('Beginning download...\n');
+    logger.info('Beginning download...\n');
     axios({
       method: 'get',
       url: url,
@@ -102,7 +103,9 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
           }
           process.stdout.clearLine(0, () => {
             process.stdout.cursorTo(0, () => {
-              process.stdout.write(progressText);
+              process.stdout.moveCursor(0, -1, () => {
+                logger.info(progressText);
+              });
             });
           });
         }
@@ -129,7 +132,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
               });
 
               zipFile.on('end', () => {
-                console.log('\nDownload complete.');
+                logger.info('Download complete.');
                 if (jsonEntries.length === 0) {
                   reject('No JSON file present in zip.');
                 } else {
@@ -162,7 +165,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
         } else {
           const outputStream = fs.createWriteStream(dataPath);
           outputStream.on('finish', () => {
-            console.log('\nDownload complete.');
+            logger.info('Download complete.');
             resolve(dataPath);
           });
           outputStream.on('error', () => {
@@ -224,7 +227,7 @@ function isZip(contentType: string, url: string): boolean {
 
 export function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
   // there might be a lot of entries. show ten per page of results
-  console.log(`${entries.length} JSON files found within ZIP archive.`);
+  logger.info(`${entries.length} JSON files found within ZIP archive.`);
   const maxPage = Math.floor((entries.length - 1) / 10);
   let currentPage = 0;
   let chosenIndex: number;
@@ -239,27 +242,27 @@ export function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
       if (currentPage < maxPage) {
         currentPage++;
       } else {
-        console.log('Already at last page.');
+        logger.menu('Already at last page.');
       }
     } else if (/^p(revious)?$/i.test(command)) {
       if (currentPage > 0) {
         currentPage--;
       } else {
-        console.log('Already at first page.');
+        logger.menu('Already at first page.');
       }
     } else if (/^go?$/i.test(command)) {
       const targetPage = parseInt(extraArgs[0]);
       if (targetPage > 0 && targetPage <= maxPage + 1) {
         currentPage = targetPage - 1;
       } else {
-        console.log("Can't go to that page.");
+        logger.menu("Can't go to that page.");
       }
     } else if (/^\d$/.test(command)) {
       chosenIndex = currentPage * 10 + parseInt(command);
-      console.log(`You selected: ${entries[chosenIndex].fileName}`);
+      logger.menu(`You selected: ${entries[chosenIndex].fileName}`);
       return true;
     } else {
-      console.log('Unrecognized command.');
+      logger.menu('Unrecognized command.');
     }
     showMenuOptions(
       currentPage,
@@ -271,9 +274,9 @@ export function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
 }
 
 function showMenuOptions(currentPage: number, maxPage: number, items: string[]) {
-  console.log(`Showing page ${currentPage + 1} of ${maxPage + 1}`);
+  logger.menu(`Showing page ${currentPage + 1} of ${maxPage + 1}`);
   items.forEach((item, idx) => {
-    console.log(`(${idx}): ${item}`);
+    logger.menu(`(${idx}): ${item}`);
   });
   const commandsToShow: string[] = [];
   if (currentPage > 0) {
@@ -285,7 +288,7 @@ function showMenuOptions(currentPage: number, maxPage: number, items: string[]) 
   if (maxPage > 0) {
     commandsToShow.push('"(g)o X" to jump to a page');
   }
-  console.log(commandsToShow.join(' | '));
+  logger.menu(commandsToShow.join(' | '));
 }
 
 export function appendResults(source: string, destination: string, prefixData: string = '') {
@@ -293,7 +296,7 @@ export function appendResults(source: string, destination: string, prefixData: s
     const sourceData = fs.readFileSync(source);
     fs.appendFileSync(destination, `${prefixData}${sourceData}`);
   } catch (err) {
-    console.log('Problem copying results to output file', err);
+    logger.error('Problem copying results to output file', err);
   }
 }
 
@@ -307,14 +310,14 @@ export async function assessTocContents(
     (locations?.inNetwork?.length ?? 0) + (locations?.allowedAmount?.length ?? 0);
   const fileText = totalFileCount === 1 ? 'this file' : 'these files';
   if (totalFileCount > 0) {
-    console.log(`Table of contents refers to ${fileText}:`);
+    logger.info(`Table of contents refers to ${fileText}:`);
     if (locations.inNetwork?.length > 0) {
-      console.log('== In-Network Rates ==');
-      locations.inNetwork.forEach(inf => console.log(`* ${inf}`));
+      logger.info('== In-Network Rates ==');
+      locations.inNetwork.forEach(inf => logger.info(`* ${inf}`));
     }
     if (locations.allowedAmount?.length > 0) {
-      console.log('== Allowed Amounts ==');
-      locations.allowedAmount.forEach(aaf => console.log(`* ${aaf}`));
+      logger.info('== Allowed Amounts ==');
+      locations.allowedAmount.forEach(aaf => logger.info(`* ${aaf}`));
     }
     const wantToValidateContents = readlineSync.keyInYNStrict(
       `Would you like to validate ${fileText}?`
@@ -352,7 +355,7 @@ export async function validateTocContents(
         for (const dataUrl of inNetwork) {
           try {
             if (await checkDataUrl(dataUrl)) {
-              console.log(`File: ${dataUrl}`);
+              logger.info(`File: ${dataUrl}`);
               const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
               if (typeof dataPath === 'string') {
                 const containedResult = await dockerManager.runContainer(
@@ -374,14 +377,14 @@ export async function validateTocContents(
                 }
               }
             } else {
-              console.log(`Could not download file: ${dataUrl}`);
+              logger.error(`Could not download file: ${dataUrl}`);
             }
           } catch (err) {
-            console.log('Problem validating referenced in-network file', err);
+            logger.error('Problem validating referenced in-network file', err);
           }
         }
       } else {
-        console.log('No schema available - not validating.');
+        logger.error('No schema available - not validating.');
       }
     });
   }
@@ -391,7 +394,7 @@ export async function validateTocContents(
         for (const dataUrl of allowedAmount) {
           try {
             if (await checkDataUrl(dataUrl)) {
-              console.log(`File: ${dataUrl}`);
+              logger.info(`File: ${dataUrl}`);
               const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
               if (typeof dataPath === 'string') {
                 const containedResult = await dockerManager.runContainer(
@@ -405,14 +408,14 @@ export async function validateTocContents(
                 }
               }
             } else {
-              console.log(`Could not download file: ${dataUrl}`);
+              logger.error(`Could not download file: ${dataUrl}`);
             }
           } catch (err) {
-            console.log('Problem validating referenced allowed-amounts file', err);
+            logger.error('Problem validating referenced allowed-amounts file', err);
           }
         }
       } else {
-        console.log('No schema available - not validating.');
+        logger.error('No schema available - not validating.');
       }
     });
   }
@@ -428,9 +431,9 @@ export async function assessReferencedProviders(
   if (providerReferences.length > 0) {
     const fileText = providerReferences.length === 1 ? 'this file' : 'these files';
     if (providerReferences.length === 1) {
-      console.log(`In-network file(s) refer to ${fileText}:`);
-      console.log('== Provider Reference ==');
-      providerReferences.forEach(prf => console.log(`* ${prf}`));
+      logger.info(`In-network file(s) refer to ${fileText}:`);
+      logger.info('== Provider Reference ==');
+      providerReferences.forEach(prf => logger.info(`* ${prf}`));
       const wantToValidateProviders = readlineSync.keyInYNStrict(
         `Would you like to validate ${fileText}?`
       );
@@ -463,7 +466,7 @@ export async function validateReferencedProviders(
         for (const dataUrl of providerReferences) {
           try {
             if (await checkDataUrl(dataUrl)) {
-              console.log(`File: ${dataUrl}`);
+              logger.info(`File: ${dataUrl}`);
               const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
               if (typeof dataPath === 'string') {
                 const containedResult = await dockerManager.runContainer(
@@ -477,14 +480,14 @@ export async function validateReferencedProviders(
                 }
               }
             } else {
-              console.log(`Could not download file: ${dataUrl}`);
+              logger.error(`Could not download file: ${dataUrl}`);
             }
           } catch (err) {
-            console.log('Problem validating referenced provider-reference file', err);
+            logger.error('Problem validating referenced provider-reference file', err);
           }
         }
       } else {
-        console.log('No schema available - not validating.');
+        logger.error('No schema available - not validating.');
       }
     });
   }

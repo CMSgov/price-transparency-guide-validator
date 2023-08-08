@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import util from 'util';
 import { config } from './utils';
 import temp from 'temp';
+import { logger } from './logger';
 
 export class SchemaManager {
   private version: string;
@@ -41,7 +42,7 @@ export class SchemaManager {
       return true;
     } else {
       // we didn't find your tag. maybe you mistyped it, so show the available ones.
-      console.log(
+      logger.error(
         `Could not find a schema version named "${version}". Available versions are:\n${tags.join(
           '\n'
         )}`

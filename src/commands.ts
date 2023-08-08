@@ -17,11 +17,12 @@ import {
 import temp from 'temp';
 import { SchemaManager } from './SchemaManager';
 import { DockerManager } from './DockerManager';
+import { logger } from './logger';
 
 export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
   // check to see if supplied json file exists
   if (!fs.existsSync(dataFile)) {
-    console.log(`Could not find data file: ${dataFile}`);
+    logger.error(`Could not find data file: ${dataFile}`);
     process.exitCode = 1;
     return;
   }
@@ -38,7 +39,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
     .then(async schemaPath => {
       temp.track();
       if (schemaPath != null) {
-        const dockerManager = new DockerManager(options.debug);
+        const dockerManager = new DockerManager();
         const containerResult = await dockerManager.runContainer(
           schemaPath,
           options.target,
@@ -72,7 +73,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
           }
         }
       } else {
-        console.log('No schema available - not validating.');
+        logger.error('No schema available - not validating.');
         process.exitCode = 1;
       }
       temp.cleanupSync();
@@ -98,7 +99,7 @@ export async function validateFromUrl(
       })
       .then(async schemaPath => {
         if (schemaPath != null) {
-          const dockerManager = new DockerManager(options.debug);
+          const dockerManager = new DockerManager();
           const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
           if (typeof dataFile === 'string') {
             const containerResult = await dockerManager.runContainer(
@@ -153,12 +154,12 @@ export async function validateFromUrl(
             dataFile.zipFile.close();
           }
         } else {
-          console.log('No schema available - not validating.');
+          logger.error('No schema available - not validating.');
           process.exitCode = 1;
         }
       });
   } else {
-    console.log('Exiting.');
+    logger.info('Exiting.');
     process.exitCode = 1;
   }
 }
@@ -170,15 +171,15 @@ export async function update() {
       await util.promisify(exec)(
         `git clone ${config.SCHEMA_REPO_URL} "${config.SCHEMA_REPO_FOLDER}"`
       );
-      console.log('Retrieved schemas.');
+      logger.info('Retrieved schemas.');
     } else {
       await util.promisify(exec)(
         `git -C "${config.SCHEMA_REPO_FOLDER}" checkout master && git -C "${config.SCHEMA_REPO_FOLDER}" pull --no-rebase -t`
       );
-      console.log('Updated schemas.');
+      logger.info('Updated schemas.');
     }
   } catch (error) {
-    console.log(`Error when updating available schemas: ${error}`);
+    logger.error(`Error when updating available schemas: ${error}`);
     process.exitCode = 1;
   }
 }
