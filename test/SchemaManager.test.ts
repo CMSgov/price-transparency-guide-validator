@@ -53,6 +53,12 @@ describe('SchemaManager', () => {
     });
 
     it('should not clone anything when the repo already exists', async () => {
+      // basic callback mock, since we don't need anything more complex than that for testing
+      mockedExec.mockImplementationOnce((_command: string, callback: any) => {
+        if (callback) {
+          callback(null, { stdout: 'ok' });
+        }
+      });
       const manager = new SchemaManager();
       await manager.ensureRepo();
       expect(mockedExec).toHaveBeenCalledTimes(0);
