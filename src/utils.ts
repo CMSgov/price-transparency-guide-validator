@@ -8,6 +8,9 @@ import temp from 'temp';
 import { createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import yauzl from 'yauzl';
+import { EOL } from 'os';
+import { DockerManager } from './DockerManager';
+import { SchemaManager } from './SchemaManager';
 
 export type ZipContents = {
   zipFile: yauzl.ZipFile;
@@ -36,119 +39,14 @@ export async function ensureRepo(repoDirectory: string) {
   }
 }
 
-export async function useRepoVersion(schemaVersion: string, schemaName: string, strict = false) {
-  try {
-    await ensureRepo(config.SCHEMA_REPO_FOLDER);
-    const tagResult = await util.promisify(exec)(
-      `git -C "${config.SCHEMA_REPO_FOLDER}" tag --list --sort=taggerdate`
-    );
-    const tags = tagResult.stdout
-      .split('\n')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-    if (tags.includes(schemaVersion)) {
-      await util.promisify(exec)(`git -C "${config.SCHEMA_REPO_FOLDER}" checkout ${schemaVersion}`);
-      let schemaContents: string | Buffer = fs.readFileSync(
-        path.join(config.SCHEMA_REPO_FOLDER, 'schemas', schemaName, `${schemaName}.json`)
-      );
-      if (strict) {
-        const modifiedSchema = JSON.parse(schemaContents.toString('utf-8'));
-        makeSchemaStrict(modifiedSchema);
-        schemaContents = JSON.stringify(modifiedSchema);
-      }
-      // write this version of the schema to a temporary file
-      temp.track();
-      const schemaDir = temp.mkdirSync('schemas');
-      const schemaFilePath = path.join(schemaDir, 'schema.json');
-      fs.writeFileSync(schemaFilePath, schemaContents, { encoding: 'utf-8' });
-      return schemaFilePath;
-    } else {
-      // we didn't find your tag. maybe you mistyped it, so show the available ones.
-      console.log(
-        `Could not find a schema version named "${schemaVersion}". Available versions are:\n${tags.join(
-          '\n'
-        )}`
-      );
-      process.exitCode = 1;
-    }
-  } catch (error) {
-    console.log(`Error when accessing schema: ${error}`);
-    process.exitCode = 1;
-  }
-}
-
-// note that this only sets additionalProperties to false at the top level, and at the first level of definitions.
-// if there are nested definitions, those will not be modified.
-function makeSchemaStrict(schema: any) {
-  if (typeof schema === 'object') {
-    schema.additionalProperties = false;
-    if (schema.definitions != null && typeof schema.definitions === 'object') {
-      for (const defKey of Object.keys(schema.definitions)) {
-        schema.definitions[defKey].additionalProperties = false;
-      }
-    }
-  }
-}
-
-export function buildRunCommand(
-  schemaPath: string,
-  dataPath: string,
-  outputPath: string,
-  containerId: string
-): string {
-  // figure out mount for schema file
-  const absoluteSchemaPath = path.resolve(schemaPath);
-  const schemaDir = path.dirname(absoluteSchemaPath);
-  const schemaFile = path.basename(absoluteSchemaPath);
-  // figure out mount for data file
-  const absoluteDataPath = path.resolve(dataPath);
-  const dataDir = path.dirname(absoluteDataPath);
-  const dataFile = path.basename(absoluteDataPath);
-  // figure out mount for output file, if provided
-  let outputDir, outputFile;
-  if (outputPath?.length > 0) {
-    const absoluteOutputPath = path.resolve(outputPath);
-    outputDir = path.dirname(absoluteOutputPath);
-    outputFile = path.basename(absoluteOutputPath);
-  }
-  if (outputDir && outputFile) {
-    return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${outputDir}":/output/ ${containerId} "schema/${schemaFile}" "data/${dataFile}" -o "output/${outputFile}"`;
-  } else {
-    return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ ${containerId} "schema/${schemaFile}" "data/${dataFile}"`;
-  }
-}
-
-export async function runContainer(schemaPath: string, dataPath: string, outputPath: string) {
-  try {
-    const containerId = await util
-      .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
-      .then(result => result.stdout.trim())
-      .catch(reason => {
-        console.log(reason.stderr);
-        return '';
-      });
-    if (containerId.length > 0) {
-      const runCommand = buildRunCommand(schemaPath, dataPath, outputPath, containerId);
-      console.log('Running validator container...');
-      return util
-        .promisify(exec)(runCommand)
-        .then(result => {
-          console.log(result.stdout);
-        })
-        .catch(reason => {
-          console.log(reason.stdout);
-          console.log(reason.stderr);
-          process.exitCode = 1;
-        });
-    } else {
-      console.log('Could not find a validator docker container.');
-      process.exitCode = 1;
-    }
-  } catch (error) {
-    console.log(`Error when running validator container: ${error}`);
-    process.exitCode = 1;
-  }
-}
+type ContainerResult = {
+  pass: boolean;
+  locations?: {
+    inNetwork?: string[];
+    allowedAmount?: string[];
+    providerReference?: string[];
+  };
+};
 
 export async function checkDataUrl(url: string) {
   try {
@@ -172,12 +70,12 @@ export async function checkDataUrl(url: string) {
       return proceedToDownload;
     } else {
       console.log(
-        `Received unsuccessful status code ${response.status} when checking data file URL.`
+        `Received unsuccessful status code ${response.status} when checking data file URL: ${url}`
       );
       return false;
     }
   } catch (e) {
-    console.log('Request failed when checking data file URL.');
+    console.log(`Request failed when checking data file URL: ${url}`);
     console.log(e.message);
     return false;
   }
@@ -388,4 +286,206 @@ function showMenuOptions(currentPage: number, maxPage: number, items: string[]) 
     commandsToShow.push('"(g)o X" to jump to a page');
   }
   console.log(commandsToShow.join(' | '));
+}
+
+export function appendResults(source: string, destination: string, prefixData: string = '') {
+  try {
+    const sourceData = fs.readFileSync(source);
+    fs.appendFileSync(destination, `${prefixData}${sourceData}`);
+  } catch (err) {
+    console.log('Problem copying results to output file', err);
+  }
+}
+
+export async function assessTocContents(
+  locations: ContainerResult['locations'],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+): Promise<string[]> {
+  const totalFileCount =
+    (locations?.inNetwork?.length ?? 0) + (locations?.allowedAmount?.length ?? 0);
+  const fileText = totalFileCount === 1 ? 'this file' : 'these files';
+  if (totalFileCount > 0) {
+    console.log(`Table of contents refers to ${fileText}:`);
+    if (locations.inNetwork?.length > 0) {
+      console.log('== In-Network Rates ==');
+      locations.inNetwork.forEach(inf => console.log(`* ${inf}`));
+    }
+    if (locations.allowedAmount?.length > 0) {
+      console.log('== Allowed Amounts ==');
+      locations.allowedAmount.forEach(aaf => console.log(`* ${aaf}`));
+    }
+    const wantToValidateContents = readlineSync.keyInYNStrict(
+      `Would you like to validate ${fileText}?`
+    );
+    if (wantToValidateContents) {
+      const providerReferences = await validateTocContents(
+        locations.inNetwork ?? [],
+        locations.allowedAmount ?? [],
+        schemaManager,
+        dockerManager,
+        outputPath
+      );
+      return providerReferences;
+    }
+  }
+  return [];
+}
+
+export async function validateTocContents(
+  inNetwork: string[],
+  allowedAmount: string[],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+): Promise<string[]> {
+  temp.track();
+  let tempOutput = '';
+  if (outputPath?.length > 0) {
+    tempOutput = path.join(temp.mkdirSync('contents'), 'contained-result');
+  }
+  const providerReferences: Set<string> = new Set<string>();
+  if (inNetwork.length > 0) {
+    await schemaManager.useSchema('in-network-rates').then(async schemaPath => {
+      if (schemaPath != null) {
+        for (const dataUrl of inNetwork) {
+          try {
+            if (await checkDataUrl(dataUrl)) {
+              console.log(`File: ${dataUrl}`);
+              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              if (typeof dataPath === 'string') {
+                const containedResult = await dockerManager.runContainer(
+                  schemaPath,
+                  'in-network-rates',
+                  dataPath,
+                  tempOutput
+                );
+                if (
+                  containedResult.pass &&
+                  containedResult.locations?.providerReference?.length > 0
+                ) {
+                  containedResult.locations.providerReference.forEach(prf =>
+                    providerReferences.add(prf)
+                  );
+                }
+                if (tempOutput.length > 0) {
+                  appendResults(tempOutput, outputPath, `${dataUrl} - in-network${EOL}`);
+                }
+              }
+            } else {
+              console.log(`Could not download file: ${dataUrl}`);
+            }
+          } catch (err) {
+            console.log('Problem validating referenced in-network file', err);
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+      }
+    });
+  }
+  if (allowedAmount.length > 0) {
+    await schemaManager.useSchema('allowed-amounts').then(async schemaPath => {
+      if (schemaPath != null) {
+        for (const dataUrl of allowedAmount) {
+          try {
+            if (await checkDataUrl(dataUrl)) {
+              console.log(`File: ${dataUrl}`);
+              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              if (typeof dataPath === 'string') {
+                const containedResult = await dockerManager.runContainer(
+                  schemaPath,
+                  'allowed-amounts',
+                  dataPath,
+                  tempOutput
+                );
+                if (tempOutput.length > 0) {
+                  appendResults(tempOutput, outputPath, `${dataUrl} - allowed-amounts${EOL}`);
+                }
+              }
+            } else {
+              console.log(`Could not download file: ${dataUrl}`);
+            }
+          } catch (err) {
+            console.log('Problem validating referenced allowed-amounts file', err);
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+      }
+    });
+  }
+  return [...providerReferences.values()];
+}
+
+export async function assessReferencedProviders(
+  providerReferences: string[],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+) {
+  if (providerReferences.length > 0) {
+    const fileText = providerReferences.length === 1 ? 'this file' : 'these files';
+    if (providerReferences.length === 1) {
+      console.log(`In-network file(s) refer to ${fileText}:`);
+      console.log('== Provider Reference ==');
+      providerReferences.forEach(prf => console.log(`* ${prf}`));
+      const wantToValidateProviders = readlineSync.keyInYNStrict(
+        `Would you like to validate ${fileText}?`
+      );
+      if (wantToValidateProviders) {
+        await validateReferencedProviders(
+          providerReferences,
+          schemaManager,
+          dockerManager,
+          outputPath
+        );
+      }
+    }
+  }
+}
+
+export async function validateReferencedProviders(
+  providerReferences: string[],
+  schemaManager: SchemaManager,
+  dockerManager: DockerManager,
+  outputPath: string
+) {
+  temp.track();
+  let tempOutput = '';
+  if (outputPath?.length > 0) {
+    tempOutput = path.join(temp.mkdirSync('providers'), 'contained-result');
+  }
+  if (providerReferences.length > 0) {
+    schemaManager.useSchema('provider-reference').then(async schemaPath => {
+      if (schemaPath != null) {
+        for (const dataUrl of providerReferences) {
+          try {
+            if (await checkDataUrl(dataUrl)) {
+              console.log(`File: ${dataUrl}`);
+              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              if (typeof dataPath === 'string') {
+                const containedResult = await dockerManager.runContainer(
+                  schemaPath,
+                  'provider-reference',
+                  dataPath,
+                  tempOutput
+                );
+                if (tempOutput.length > 0) {
+                  appendResults(tempOutput, outputPath, `${dataUrl} - provider-reference${EOL}`);
+                }
+              }
+            } else {
+              console.log(`Could not download file: ${dataUrl}`);
+            }
+          } catch (err) {
+            console.log('Problem validating referenced provider-reference file', err);
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+      }
+    });
+  }
 }

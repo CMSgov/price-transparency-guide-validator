@@ -12,6 +12,13 @@ async function main() {
   program
     .name('cms-mrf-validator')
     .description('Tool for validating health coverage machine-readable files.')
+    .option('-d, --debug', 'show debug output')
+    .hook('preAction', (thisCommand, actionCommand) => {
+      if (thisCommand.opts().debug) {
+        console.log(process.argv.join(' '));
+        actionCommand.setOptionValue('debug', true);
+      }
+    })
     .command('validate')
     .description('Validate a file against a specific published version of a CMS schema.')
     .usage('<data-file> <schema-version> [options]')
@@ -47,7 +54,15 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
-    .action(validateFromUrl);
+    .action((dataUrl, schemaVersion, options) => {
+      validateFromUrl(dataUrl, schemaVersion, options).then(result => {
+        if (result) {
+          process.exitCode = 0;
+        } else {
+          process.exitCode = 1;
+        }
+      });
+    });
 
   program
     .command('update')

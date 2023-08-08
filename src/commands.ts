@@ -7,17 +7,16 @@ import { OptionValues } from 'commander';
 
 import {
   config,
-  runContainer,
-  useRepoVersion,
   downloadDataFile,
   checkDataUrl,
   chooseJsonFile,
-  getEntryFromZip
+  getEntryFromZip,
+  assessTocContents,
+  assessReferencedProviders
 } from './utils';
 import temp from 'temp';
-import crypto from 'crypto';
-
-crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION;
+import { SchemaManager } from './SchemaManager';
+import { DockerManager } from './DockerManager';
 
 export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
   // check to see if supplied json file exists
@@ -26,15 +25,58 @@ export async function validate(dataFile: string, schemaVersion: string, options:
     process.exitCode = 1;
     return;
   }
-  // get the schema that matches the chosen version and target name. then, use it to validate.
-  useRepoVersion(schemaVersion, options.target, options.strict).then(schemaPath => {
-    if (schemaPath != null) {
-      runContainer(schemaPath, dataFile, options.out);
-    } else {
-      console.log('No schema available - not validating.');
-      process.exitCode = 1;
-    }
-  });
+  const schemaManager = new SchemaManager();
+  await schemaManager.ensureRepo();
+  schemaManager.strict = options.strict;
+  return schemaManager
+    .useVersion(schemaVersion)
+    .then(versionIsAvailable => {
+      if (versionIsAvailable) {
+        return schemaManager.useSchema(options.target);
+      }
+    })
+    .then(async schemaPath => {
+      temp.track();
+      if (schemaPath != null) {
+        const dockerManager = new DockerManager(options.debug);
+        const containerResult = await dockerManager.runContainer(
+          schemaPath,
+          options.target,
+          dataFile,
+          options.out
+        );
+        if (containerResult.pass) {
+          if (options.target === 'table-of-contents') {
+            const providerReferences = await assessTocContents(
+              containerResult.locations,
+              schemaManager,
+              dockerManager,
+              options.out
+            );
+            await assessReferencedProviders(
+              providerReferences,
+              schemaManager,
+              dockerManager,
+              options.out
+            );
+          } else if (
+            options.target === 'in-network-rates' &&
+            containerResult.locations?.providerReference?.length > 0
+          ) {
+            await assessReferencedProviders(
+              containerResult.locations.providerReference,
+              schemaManager,
+              dockerManager,
+              options.out
+            );
+          }
+        }
+      } else {
+        console.log('No schema available - not validating.');
+        process.exitCode = 1;
+      }
+      temp.cleanupSync();
+    });
 }
 
 export async function validateFromUrl(
@@ -43,39 +85,81 @@ export async function validateFromUrl(
   options: OptionValues
 ) {
   temp.track();
-  try {
-    if (await checkDataUrl(dataUrl)) {
-      return useRepoVersion(schemaVersion, options.target, options.strict).then(
-        async schemaPath => {
-          if (schemaPath != null) {
-            const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
-            if (typeof dataFile === 'string') {
-              return await runContainer(schemaPath, dataFile, options.out);
-            } else {
-              let continuation = true;
-              // we have multiple files, so let's choose as many as we want
-              while (continuation === true) {
-                const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
-                await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
-                await runContainer(schemaPath, dataFile.dataPath, options.out);
-                continuation = readlineSync.keyInYNStrict(
-                  'Would you like to validate another file in the ZIP?'
+  if (await checkDataUrl(dataUrl)) {
+    const schemaManager = new SchemaManager();
+    await schemaManager.ensureRepo();
+    schemaManager.strict = options.strict;
+    return schemaManager
+      .useVersion(schemaVersion)
+      .then(versionIsAvailable => {
+        if (versionIsAvailable) {
+          return schemaManager.useSchema(options.target);
+        }
+      })
+      .then(async schemaPath => {
+        if (schemaPath != null) {
+          const dockerManager = new DockerManager(options.debug);
+          const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
+          if (typeof dataFile === 'string') {
+            const containerResult = await dockerManager.runContainer(
+              schemaPath,
+              options.target,
+              dataFile,
+              options.out
+            );
+            if (containerResult.pass) {
+              if (options.target === 'table-of-contents') {
+                const providerReferences = await assessTocContents(
+                  containerResult.locations,
+                  schemaManager,
+                  dockerManager,
+                  options.out
+                );
+                await assessReferencedProviders(
+                  providerReferences,
+                  schemaManager,
+                  dockerManager,
+                  options.out
+                );
+              } else if (
+                options.target === 'in-network-rates' &&
+                containerResult.locations?.providerReference?.length > 0
+              ) {
+                await assessReferencedProviders(
+                  containerResult.locations.providerReference,
+                  schemaManager,
+                  dockerManager,
+                  options.out
                 );
               }
-              dataFile.zipFile.close();
             }
+            return containerResult;
           } else {
-            console.log('No schema available - not validating.');
-            process.exitCode = 1;
+            let continuation = true;
+            // we have multiple files, so let's choose as many as we want
+            while (continuation === true) {
+              const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
+              await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
+              await dockerManager.runContainer(
+                schemaPath,
+                options.target,
+                dataFile.dataPath,
+                options.out
+              );
+              continuation = readlineSync.keyInYNStrict(
+                'Would you like to validate another file in the ZIP?'
+              );
+            }
+            dataFile.zipFile.close();
           }
+        } else {
+          console.log('No schema available - not validating.');
+          process.exitCode = 1;
         }
-      );
-    } else {
-      console.log('Exiting.');
-      process.exitCode = 1;
-    }
-  } finally {
-    temp.cleanupSync();
+      });
+  } else {
+    console.log('Exiting.');
+    process.exitCode = 1;
   }
 }
 

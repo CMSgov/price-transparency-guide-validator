@@ -2,19 +2,28 @@ import 'jest-extended';
 import path from 'path';
 import * as validatorUtils from '../src/utils';
 import { validate, validateFromUrl } from '../src/commands';
+import { SchemaManager } from '../src/SchemaManager';
+import { DockerManager } from '../src/DockerManager';
 
 describe('commands', () => {
   describe('#validate', () => {
-    let useRepoSpy: jest.SpyInstance;
+    let useVersionSpy: jest.SpyInstance;
+    let useSchemaSpy: jest.SpyInstance;
     let runContainerSpy: jest.SpyInstance;
 
     beforeAll(() => {
-      useRepoSpy = jest.spyOn(validatorUtils, 'useRepoVersion').mockResolvedValue(undefined);
-      runContainerSpy = jest.spyOn(validatorUtils, 'runContainer').mockResolvedValue(undefined);
+      useVersionSpy = jest.spyOn(SchemaManager.prototype, 'useVersion').mockResolvedValue(true);
+      useSchemaSpy = jest
+        .spyOn(SchemaManager.prototype, 'useSchema')
+        .mockResolvedValue('schemaPath');
+      runContainerSpy = jest
+        .spyOn(DockerManager.prototype, 'runContainer')
+        .mockResolvedValue({ pass: false });
     });
 
     beforeEach(() => {
-      useRepoSpy.mockClear();
+      useVersionSpy.mockClear();
+      useSchemaSpy.mockClear();
       runContainerSpy.mockClear();
     });
 
@@ -24,7 +33,7 @@ describe('commands', () => {
         'schema version 278',
         { target: null }
       );
-      expect(useRepoSpy).toHaveBeenCalledTimes(1);
+      expect(useVersionSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should not continue processing when the data file does not exist', async () => {
@@ -33,11 +42,11 @@ describe('commands', () => {
         'schema version 8',
         { target: null }
       );
-      expect(useRepoSpy).toHaveBeenCalledTimes(0);
+      expect(useVersionSpy).toHaveBeenCalledTimes(0);
     });
 
     it('should run the container when the requested schema is available', async () => {
-      useRepoSpy.mockResolvedValueOnce('good.json');
+      useSchemaSpy.mockResolvedValueOnce('good.json');
       await validate(
         path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'),
         'schema version 278',
@@ -56,29 +65,34 @@ describe('commands', () => {
     });
 
     afterAll(() => {
-      useRepoSpy.mockRestore();
+      useVersionSpy.mockRestore();
+      useSchemaSpy.mockRestore();
       runContainerSpy.mockRestore();
     });
   });
 
   describe('#validateFromUrl', () => {
     let checkDataUrlSpy: jest.SpyInstance;
-    let useRepoSpy: jest.SpyInstance;
+    let useSchemaSpy: jest.SpyInstance;
     let downloadDataSpy: jest.SpyInstance;
     let runContainerSpy: jest.SpyInstance;
 
     beforeAll(() => {
       checkDataUrlSpy = jest.spyOn(validatorUtils, 'checkDataUrl');
-      useRepoSpy = jest.spyOn(validatorUtils, 'useRepoVersion').mockResolvedValue(undefined);
+      useSchemaSpy = jest
+        .spyOn(SchemaManager.prototype, 'useSchema')
+        .mockResolvedValue('schemaPath');
       downloadDataSpy = jest
         .spyOn(validatorUtils, 'downloadDataFile')
         .mockResolvedValue('data.json');
-      runContainerSpy = jest.spyOn(validatorUtils, 'runContainer').mockResolvedValue(undefined);
+      runContainerSpy = jest
+        .spyOn(DockerManager.prototype, 'runContainer')
+        .mockResolvedValue({ pass: false });
     });
 
     beforeEach(() => {
       checkDataUrlSpy.mockClear();
-      useRepoSpy.mockClear();
+      useSchemaSpy.mockClear();
       downloadDataSpy.mockClear();
       runContainerSpy.mockClear();
     });
@@ -86,38 +100,46 @@ describe('commands', () => {
     it('should continue processing when the data url is valid and content length is less than or equal to the size limit', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
       await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
-      expect(useRepoSpy).toHaveBeenCalledTimes(1);
+      expect(useSchemaSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should not continue processing when the data url is invalid', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(false);
       await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
-      expect(useRepoSpy).toHaveBeenCalledTimes(0);
+      expect(useSchemaSpy).toHaveBeenCalledTimes(0);
     });
 
     it('should download the data file when the data url is valid and the requested schema is available', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
-      useRepoSpy.mockResolvedValueOnce('schemapath.json');
+      useSchemaSpy.mockResolvedValueOnce('schemapath.json');
       downloadDataSpy.mockResolvedValueOnce('data.json');
-      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
+      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {
+        target: 'in-network-rates'
+      });
       expect(downloadDataSpy).toHaveBeenCalledTimes(1);
       expect(downloadDataSpy).toHaveBeenCalledWith(
         'http://example.org/data.json',
         expect.any(String)
       );
       expect(runContainerSpy).toHaveBeenCalledTimes(1);
-      expect(runContainerSpy).toHaveBeenCalledWith('schemapath.json', 'data.json', undefined);
+      expect(runContainerSpy).toHaveBeenCalledWith(
+        'schemapath.json',
+        'in-network-rates',
+        'data.json',
+        undefined
+      );
     });
 
     it('should not download the data file when the requested schema is not available', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
+      useSchemaSpy.mockResolvedValueOnce(null);
       await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
       expect(downloadDataSpy).toHaveBeenCalledTimes(0);
     });
 
     afterAll(() => {
       checkDataUrlSpy.mockRestore();
-      useRepoSpy.mockRestore();
+      useSchemaSpy.mockRestore();
       downloadDataSpy.mockRestore();
       runContainerSpy.mockRestore();
     });
