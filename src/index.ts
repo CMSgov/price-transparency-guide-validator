@@ -14,7 +14,7 @@ async function main() {
     .name('cms-mrf-validator')
     .description('Tool for validating health coverage machine-readable files.')
     .option('-d, --debug', 'show debug output')
-    .hook('preAction', (thisCommand, actionCommand) => {
+    .hook('preAction', thisCommand => {
       if (thisCommand.opts().debug) {
         logger.level = 'debug';
         logger.debug(process.argv.join(' '));
@@ -35,6 +35,7 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
+    .option('-y, --yes-all', 'automatically respond "yes" to download confirmation prompts')
     .action(validate);
 
   program
@@ -55,6 +56,7 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
+    .option('-y, --yes-all', 'automatically respond "yes" to download confirmation prompts')
     .action((dataUrl, schemaVersion, options) => {
       validateFromUrl(dataUrl, schemaVersion, options).then(result => {
         if (result) {

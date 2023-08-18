@@ -8,7 +8,7 @@ import { logger } from './logger';
 export class DockerManager {
   containerId = '';
 
-  constructor() {}
+  constructor(public outputPath = '') {}
 
   private async initContainerId(): Promise<void> {
     this.containerId = await util
@@ -24,7 +24,7 @@ export class DockerManager {
     schemaPath: string,
     schemaName: string,
     dataPath: string,
-    outputPath: string
+    outputPath = this.outputPath
   ): Promise<ContainerResult> {
     try {
       if (this.containerId.length === 0) {
@@ -115,6 +115,7 @@ export class DockerManager {
 
 export type ContainerResult = {
   pass: boolean;
+  text?: string;
   locations?: {
     inNetwork?: string[];
     allowedAmount?: string[];

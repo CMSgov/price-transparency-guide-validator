@@ -1,32 +1,52 @@
 import 'jest-extended';
 import path from 'path';
-import * as validatorUtils from '../src/utils';
 import { validate, validateFromUrl } from '../src/commands';
 import { SchemaManager } from '../src/SchemaManager';
 import { DockerManager } from '../src/DockerManager';
+import { DownloadManager } from '../src/DownloadManager';
 
 describe('commands', () => {
+  let checkDataUrlSpy: jest.SpyInstance;
+  let ensureRepoSpy: jest.SpyInstance;
+  let useVersionSpy: jest.SpyInstance;
+  let useSchemaSpy: jest.SpyInstance;
+  let downloadDataSpy: jest.SpyInstance;
+  let runContainerSpy: jest.SpyInstance;
+
+  beforeAll(() => {
+    checkDataUrlSpy = jest.spyOn(DownloadManager.prototype, 'checkDataUrl');
+    ensureRepoSpy = jest
+      .spyOn(SchemaManager.prototype, 'ensureRepo')
+      .mockResolvedValue({ stdout: '', stderr: '' });
+    useVersionSpy = jest.spyOn(SchemaManager.prototype, 'useVersion').mockResolvedValue(true);
+    useSchemaSpy = jest.spyOn(SchemaManager.prototype, 'useSchema').mockResolvedValue('schemaPath');
+    downloadDataSpy = jest
+      .spyOn(DownloadManager.prototype, 'downloadDataFile')
+      .mockResolvedValue('data.json');
+    runContainerSpy = jest
+      .spyOn(DockerManager.prototype, 'runContainer')
+      .mockResolvedValue({ pass: false });
+  });
+
+  beforeEach(() => {
+    checkDataUrlSpy.mockClear();
+    ensureRepoSpy.mockClear();
+    useVersionSpy.mockClear();
+    useSchemaSpy.mockClear();
+    downloadDataSpy.mockClear();
+    runContainerSpy.mockClear();
+  });
+
+  afterAll(() => {
+    checkDataUrlSpy.mockRestore();
+    ensureRepoSpy.mockRestore();
+    useVersionSpy.mockRestore();
+    useSchemaSpy.mockRestore();
+    downloadDataSpy.mockRestore();
+    runContainerSpy.mockRestore();
+  });
+
   describe('#validate', () => {
-    let useVersionSpy: jest.SpyInstance;
-    let useSchemaSpy: jest.SpyInstance;
-    let runContainerSpy: jest.SpyInstance;
-
-    beforeAll(() => {
-      useVersionSpy = jest.spyOn(SchemaManager.prototype, 'useVersion').mockResolvedValue(true);
-      useSchemaSpy = jest
-        .spyOn(SchemaManager.prototype, 'useSchema')
-        .mockResolvedValue('schemaPath');
-      runContainerSpy = jest
-        .spyOn(DockerManager.prototype, 'runContainer')
-        .mockResolvedValue({ pass: false });
-    });
-
-    beforeEach(() => {
-      useVersionSpy.mockClear();
-      useSchemaSpy.mockClear();
-      runContainerSpy.mockClear();
-    });
-
     it('should continue processing when the data file exists', async () => {
       await validate(
         path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'),
@@ -63,40 +83,9 @@ describe('commands', () => {
       );
       expect(runContainerSpy).toHaveBeenCalledTimes(0);
     });
-
-    afterAll(() => {
-      useVersionSpy.mockRestore();
-      useSchemaSpy.mockRestore();
-      runContainerSpy.mockRestore();
-    });
   });
 
   describe('#validateFromUrl', () => {
-    let checkDataUrlSpy: jest.SpyInstance;
-    let useSchemaSpy: jest.SpyInstance;
-    let downloadDataSpy: jest.SpyInstance;
-    let runContainerSpy: jest.SpyInstance;
-
-    beforeAll(() => {
-      checkDataUrlSpy = jest.spyOn(validatorUtils, 'checkDataUrl');
-      useSchemaSpy = jest
-        .spyOn(SchemaManager.prototype, 'useSchema')
-        .mockResolvedValue('schemaPath');
-      downloadDataSpy = jest
-        .spyOn(validatorUtils, 'downloadDataFile')
-        .mockResolvedValue('data.json');
-      runContainerSpy = jest
-        .spyOn(DockerManager.prototype, 'runContainer')
-        .mockResolvedValue({ pass: false });
-    });
-
-    beforeEach(() => {
-      checkDataUrlSpy.mockClear();
-      useSchemaSpy.mockClear();
-      downloadDataSpy.mockClear();
-      runContainerSpy.mockClear();
-    });
-
     it('should continue processing when the data url is valid and content length is less than or equal to the size limit', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
       await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
@@ -117,16 +106,12 @@ describe('commands', () => {
         target: 'in-network-rates'
       });
       expect(downloadDataSpy).toHaveBeenCalledTimes(1);
-      expect(downloadDataSpy).toHaveBeenCalledWith(
-        'http://example.org/data.json',
-        expect.any(String)
-      );
+      expect(downloadDataSpy).toHaveBeenCalledWith('http://example.org/data.json');
       expect(runContainerSpy).toHaveBeenCalledTimes(1);
       expect(runContainerSpy).toHaveBeenCalledWith(
         'schemapath.json',
         'in-network-rates',
-        'data.json',
-        undefined
+        'data.json'
       );
     });
 
@@ -135,13 +120,6 @@ describe('commands', () => {
       useSchemaSpy.mockResolvedValueOnce(null);
       await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
       expect(downloadDataSpy).toHaveBeenCalledTimes(0);
-    });
-
-    afterAll(() => {
-      checkDataUrlSpy.mockRestore();
-      useSchemaSpy.mockRestore();
-      downloadDataSpy.mockRestore();
-      runContainerSpy.mockRestore();
     });
   });
 });

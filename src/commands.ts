@@ -7,8 +7,6 @@ import { OptionValues } from 'commander';
 
 import {
   config,
-  downloadDataFile,
-  checkDataUrl,
   chooseJsonFile,
   getEntryFromZip,
   assessTocContents,
@@ -18,6 +16,7 @@ import temp from 'temp';
 import { SchemaManager } from './SchemaManager';
 import { DockerManager } from './DockerManager';
 import { logger } from './logger';
+import { DownloadManager } from './DownloadManager';
 
 export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
   // check to see if supplied json file exists
@@ -39,12 +38,12 @@ export async function validate(dataFile: string, schemaVersion: string, options:
     .then(async schemaPath => {
       temp.track();
       if (schemaPath != null) {
-        const dockerManager = new DockerManager();
+        const dockerManager = new DockerManager(options.out);
+        const downloadManager = new DownloadManager(options.yesAll);
         const containerResult = await dockerManager.runContainer(
           schemaPath,
           options.target,
-          dataFile,
-          options.out
+          dataFile
         );
         if (containerResult.pass) {
           if (options.target === 'table-of-contents') {
@@ -52,12 +51,14 @@ export async function validate(dataFile: string, schemaVersion: string, options:
               containerResult.locations,
               schemaManager,
               dockerManager,
+              downloadManager,
               options.out
             );
             await assessReferencedProviders(
               providerReferences,
               schemaManager,
               dockerManager,
+              downloadManager,
               options.out
             );
           } else if (
@@ -68,6 +69,7 @@ export async function validate(dataFile: string, schemaVersion: string, options:
               containerResult.locations.providerReference,
               schemaManager,
               dockerManager,
+              downloadManager,
               options.out
             );
           }
@@ -86,7 +88,8 @@ export async function validateFromUrl(
   options: OptionValues
 ) {
   temp.track();
-  if (await checkDataUrl(dataUrl)) {
+  const downloadManager = new DownloadManager(options.yesAll);
+  if (await downloadManager.checkDataUrl(dataUrl)) {
     const schemaManager = new SchemaManager();
     await schemaManager.ensureRepo();
     schemaManager.strict = options.strict;
@@ -99,14 +102,13 @@ export async function validateFromUrl(
       })
       .then(async schemaPath => {
         if (schemaPath != null) {
-          const dockerManager = new DockerManager();
-          const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
+          const dockerManager = new DockerManager(options.out);
+          const dataFile = await downloadManager.downloadDataFile(dataUrl);
           if (typeof dataFile === 'string') {
             const containerResult = await dockerManager.runContainer(
               schemaPath,
               options.target,
-              dataFile,
-              options.out
+              dataFile
             );
             if (containerResult.pass) {
               if (options.target === 'table-of-contents') {
@@ -114,12 +116,14 @@ export async function validateFromUrl(
                   containerResult.locations,
                   schemaManager,
                   dockerManager,
+                  downloadManager,
                   options.out
                 );
                 await assessReferencedProviders(
                   providerReferences,
                   schemaManager,
                   dockerManager,
+                  downloadManager,
                   options.out
                 );
               } else if (
@@ -130,6 +134,7 @@ export async function validateFromUrl(
                   containerResult.locations.providerReference,
                   schemaManager,
                   dockerManager,
+                  downloadManager,
                   options.out
                 );
               }
@@ -141,12 +146,7 @@ export async function validateFromUrl(
             while (continuation === true) {
               const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
               await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
-              await dockerManager.runContainer(
-                schemaPath,
-                options.target,
-                dataFile.dataPath,
-                options.out
-              );
+              await dockerManager.runContainer(schemaPath, options.target, dataFile.dataPath);
               continuation = readlineSync.keyInYNStrict(
                 'Would you like to validate another file in the ZIP?'
               );

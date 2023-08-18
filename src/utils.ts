@@ -1,17 +1,13 @@
-import util from 'util';
-import axios from 'axios';
 import readlineSync from 'readline-sync';
 import path from 'path';
-import { exec } from 'child_process';
 import fs from 'fs-extra';
 import temp from 'temp';
-import { createGunzip } from 'zlib';
-import { pipeline } from 'stream/promises';
 import yauzl from 'yauzl';
 import { EOL } from 'os';
 import { DockerManager } from './DockerManager';
 import { SchemaManager } from './SchemaManager';
 import { logger } from './logger';
+import { DownloadManager } from './DownloadManager';
 
 export type ZipContents = {
   zipFile: yauzl.ZipFile;
@@ -30,16 +26,6 @@ export const config = {
   SCHEMA_REPO_FOLDER: path.normalize(path.join(__dirname, '..', 'schema-repo'))
 };
 
-const ONE_MEGABYTE = 1024 * 1024;
-const DATA_SIZE_WARNING_THRESHOLD = ONE_MEGABYTE * 1024; // 1 gigabyte
-
-export async function ensureRepo(repoDirectory: string) {
-  // check if the repo exists, and if not, try to clone it
-  if (!fs.existsSync(path.join(repoDirectory, '.git'))) {
-    return util.promisify(exec)(`git clone ${config.SCHEMA_REPO_URL} "${repoDirectory}"`);
-  }
-}
-
 type ContainerResult = {
   pass: boolean;
   locations?: {
@@ -48,142 +34,6 @@ type ContainerResult = {
     providerReference?: string[];
   };
 };
-
-export async function checkDataUrl(url: string) {
-  try {
-    const response = await axios.head(url);
-    if (response.status === 200) {
-      let proceedToDownload: boolean;
-      const contentLength = parseInt(response.headers['content-length']);
-      if (isNaN(contentLength)) {
-        proceedToDownload = readlineSync.keyInYNStrict(
-          'Data file size is unknown. Download this file?'
-        );
-      } else if (contentLength > DATA_SIZE_WARNING_THRESHOLD) {
-        proceedToDownload = readlineSync.keyInYNStrict(
-          `Data file is ${(contentLength / ONE_MEGABYTE).toFixed(
-            2
-          )} MB in size. Download this file?`
-        );
-      } else {
-        proceedToDownload = true;
-      }
-      return proceedToDownload;
-    } else {
-      logger.error(
-        `Received unsuccessful status code ${response.status} when checking data file URL: ${url}`
-      );
-      return false;
-    }
-  } catch (e) {
-    logger.error(`Request failed when checking data file URL: ${url}`);
-    logger.error(e.message);
-    return false;
-  }
-}
-
-export async function downloadDataFile(url: string, folder: string): Promise<string | ZipContents> {
-  const filenameGuess = 'data.json';
-  const dataPath = path.join(folder, filenameGuess);
-  return new Promise((resolve, reject) => {
-    logger.info('Beginning download...\n');
-    axios({
-      method: 'get',
-      url: url,
-      responseType: 'stream',
-      onDownloadProgress: progressEvent => {
-        if (process.stdout.isTTY) {
-          let progressText: string;
-          if (progressEvent.progress != null) {
-            progressText = `Downloaded ${Math.floor(progressEvent.progress * 100)}% of file (${
-              progressEvent.loaded
-            } bytes)`;
-          } else {
-            progressText = `Downloaded ${progressEvent.loaded} bytes`;
-          }
-          process.stdout.clearLine(0, () => {
-            process.stdout.cursorTo(0, () => {
-              process.stdout.moveCursor(0, -1, () => {
-                logger.info(progressText);
-              });
-            });
-          });
-        }
-      }
-    })
-      .then(response => {
-        const contentType = response.headers['content-type'] ?? 'application/octet-stream';
-        if (isZip(contentType, url)) {
-          // zips require additional work to find a JSON file inside
-          const zipPath = path.join(folder, 'data.zip');
-          const zipOutputStream = fs.createWriteStream(zipPath);
-          pipeline(response.data, zipOutputStream).then(() => {
-            yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (err, zipFile) => {
-              if (err != null) {
-                reject(err);
-              }
-              const jsonEntries: yauzl.Entry[] = [];
-
-              zipFile.on('entry', (entry: yauzl.Entry) => {
-                if (entry.fileName.endsWith('.json')) {
-                  jsonEntries.push(entry);
-                }
-                zipFile.readEntry();
-              });
-
-              zipFile.on('end', () => {
-                logger.info('Download complete.');
-                if (jsonEntries.length === 0) {
-                  reject('No JSON file present in zip.');
-                } else {
-                  let chosenEntry: yauzl.Entry;
-                  if (jsonEntries.length === 1) {
-                    chosenEntry = jsonEntries[0];
-                    zipFile.openReadStream(chosenEntry, (err, readStream) => {
-                      const outputStream = fs.createWriteStream(dataPath);
-                      outputStream.on('finish', () => {
-                        zipFile.close();
-                        resolve(dataPath);
-                      });
-                      outputStream.on('error', () => {
-                        zipFile.close();
-                        reject('Error writing downloaded file.');
-                      });
-                      readStream.pipe(outputStream);
-                    });
-                  } else {
-                    jsonEntries.sort((a, b) => {
-                      return a.fileName.localeCompare(b.fileName);
-                    });
-                    resolve({ zipFile, jsonEntries, dataPath });
-                  }
-                }
-              });
-              zipFile.readEntry();
-            });
-          });
-        } else {
-          const outputStream = fs.createWriteStream(dataPath);
-          outputStream.on('finish', () => {
-            logger.info('Download complete.');
-            resolve(dataPath);
-          });
-          outputStream.on('error', () => {
-            reject('Error writing downloaded file.');
-          });
-
-          if (isGzip(contentType, url)) {
-            pipeline(response.data, createGunzip(), outputStream);
-          } else {
-            response.data.pipe(outputStream);
-          }
-        }
-      })
-      .catch(reason => {
-        reject('Error downloading data file.');
-      });
-  });
-}
 
 export async function getEntryFromZip(
   zipFile: yauzl.ZipFile,
@@ -210,7 +60,7 @@ export async function getEntryFromZip(
   });
 }
 
-function isGzip(contentType: string, url: string): boolean {
+export function isGzip(contentType: string, url: string): boolean {
   return (
     contentType === 'application/gzip' ||
     contentType === 'application/x-gzip' ||
@@ -218,7 +68,7 @@ function isGzip(contentType: string, url: string): boolean {
   );
 }
 
-function isZip(contentType: string, url: string): boolean {
+export function isZip(contentType: string, url: string): boolean {
   return (
     contentType === 'application/zip' ||
     (contentType === 'application/octet-stream' && /\.zip(\?|$)/.test(url))
@@ -304,6 +154,7 @@ export async function assessTocContents(
   locations: ContainerResult['locations'],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
+  downloadManager: DownloadManager,
   outputPath: string
 ): Promise<string[]> {
   const totalFileCount =
@@ -328,6 +179,7 @@ export async function assessTocContents(
         locations.allowedAmount ?? [],
         schemaManager,
         dockerManager,
+        downloadManager,
         outputPath
       );
       return providerReferences;
@@ -341,6 +193,7 @@ export async function validateTocContents(
   allowedAmount: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
+  downloadManager: DownloadManager,
   outputPath: string
 ): Promise<string[]> {
   temp.track();
@@ -354,9 +207,9 @@ export async function validateTocContents(
       if (schemaPath != null) {
         for (const dataUrl of inNetwork) {
           try {
-            if (await checkDataUrl(dataUrl)) {
+            if (await downloadManager.checkDataUrl(dataUrl)) {
               logger.info(`File: ${dataUrl}`);
-              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              const dataPath = await downloadManager.downloadDataFile(dataUrl);
               if (typeof dataPath === 'string') {
                 const containedResult = await dockerManager.runContainer(
                   schemaPath,
@@ -393,9 +246,9 @@ export async function validateTocContents(
       if (schemaPath != null) {
         for (const dataUrl of allowedAmount) {
           try {
-            if (await checkDataUrl(dataUrl)) {
+            if (await downloadManager.checkDataUrl(dataUrl)) {
               logger.info(`File: ${dataUrl}`);
-              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              const dataPath = await downloadManager.downloadDataFile(dataUrl);
               if (typeof dataPath === 'string') {
                 const containedResult = await dockerManager.runContainer(
                   schemaPath,
@@ -426,6 +279,7 @@ export async function assessReferencedProviders(
   providerReferences: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
+  downloadManager: DownloadManager,
   outputPath: string
 ) {
   if (providerReferences.length > 0) {
@@ -442,6 +296,7 @@ export async function assessReferencedProviders(
           providerReferences,
           schemaManager,
           dockerManager,
+          downloadManager,
           outputPath
         );
       }
@@ -453,6 +308,7 @@ export async function validateReferencedProviders(
   providerReferences: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
+  downloadManager: DownloadManager,
   outputPath: string
 ) {
   temp.track();
@@ -465,9 +321,9 @@ export async function validateReferencedProviders(
       if (schemaPath != null) {
         for (const dataUrl of providerReferences) {
           try {
-            if (await checkDataUrl(dataUrl)) {
+            if (await downloadManager.checkDataUrl(dataUrl)) {
               logger.info(`File: ${dataUrl}`);
-              const dataPath = await downloadDataFile(dataUrl, temp.mkdirSync());
+              const dataPath = await downloadManager.downloadDataFile(dataUrl);
               if (typeof dataPath === 'string') {
                 const containedResult = await dockerManager.runContainer(
                   schemaPath,
