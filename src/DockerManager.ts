@@ -3,18 +3,19 @@ import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
 import temp from 'temp';
+import { logger } from './logger';
 
 export class DockerManager {
   containerId = '';
 
-  constructor(public debug = false) {}
+  constructor() {}
 
   private async initContainerId(): Promise<void> {
     this.containerId = await util
       .promisify(exec)('docker images validator:latest --format "{{.ID}}"')
       .then(result => result.stdout.trim())
       .catch(reason => {
-        console.log(reason.stderr);
+        logger.error(reason.stderr);
         return '';
       });
   }
@@ -37,10 +38,8 @@ export class DockerManager {
         const containerLocationPath = path.join(outputDir, 'locations.json');
         // copy output files after it finishes
         const runCommand = this.buildRunCommand(schemaPath, dataPath, outputDir, schemaName);
-        console.log('Running validator container...');
-        if (this.debug) {
-          console.log(runCommand);
-        }
+        logger.info('Running validator container...');
+        logger.debug(runCommand);
         return util
           .promisify(exec)(runCommand)
           .then(result => {
@@ -53,7 +52,7 @@ export class DockerManager {
                 fs.copySync(containerOutputPath, outputPath);
               } else {
                 const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
-                console.log(outputText);
+                logger.info(outputText);
               }
             }
             if (fs.existsSync(containerLocationPath)) {
@@ -74,19 +73,19 @@ export class DockerManager {
                 fs.copySync(containerOutputPath, outputPath);
               } else {
                 const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
-                console.log(outputText);
+                logger.info(outputText);
               }
             }
             process.exitCode = 1;
             return { pass: false };
           });
       } else {
-        console.log('Could not find a validator docker container.');
+        logger.error('Could not find a validator docker container.');
         process.exitCode = 1;
         return { pass: false };
       }
     } catch (error) {
-      console.log(`Error when running validator container: ${error}`);
+      logger.error(`Error when running validator container: ${error}`);
       process.exitCode = 1;
       return { pass: false };
     }

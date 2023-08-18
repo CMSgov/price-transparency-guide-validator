@@ -3,9 +3,10 @@
 import { program, Option } from 'commander';
 import { validate, update, validateFromUrl } from './commands';
 import { config } from './utils';
+import { logger } from './logger';
 
 main().catch(error => {
-  console.log(`Encountered an unexpected error: ${error}`);
+  logger.error(`Encountered an unexpected error: ${error}`);
 });
 
 async function main() {
@@ -15,8 +16,8 @@ async function main() {
     .option('-d, --debug', 'show debug output')
     .hook('preAction', (thisCommand, actionCommand) => {
       if (thisCommand.opts().debug) {
-        console.log(process.argv.join(' '));
-        actionCommand.setOptionValue('debug', true);
+        logger.level = 'debug';
+        logger.debug(process.argv.join(' '));
       }
     })
     .command('validate')
