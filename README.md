@@ -69,10 +69,10 @@ Options:
   -h, --help                                       display help for command
 
 Commands:
-  validate [options] <data-file> <schema-version>  Validate a file against a specific published version of a CMS schema.
-  from-url [options] <data-url> <schema-version>   Validate the file retrieved from a URL against a specific published version of a CMS schema.
-  update                                           Update the available schemas from the CMS repository.
-  help [command]                                   display help for command
+  validate [options] <data-file>  Validate a file against a specific published version of a CMS schema.
+  from-url [options] <data-url>   Validate the file retrieved from a URL against a specific published version of a CMS schema.
+  update                          Update the available schemas from the CMS repository.
+  help [command]                  display help for command
 ```
 
 ### Update available schemas
@@ -92,16 +92,16 @@ Validating a file against one of the provided schemas is the primary usage of th
 From the installed directory:
 
 ```
-cms-mrf-validator validate <data-file> <schema-version> [-o out] [-t target]
+cms-mrf-validator validate <data-file> [options]
 ```
 
 Example usages:
 
 ```bash
-# basic usage, printing output directly and using the default in-network-rates schema
-cms-mrf-validator validate my-data.json v1.0.0
-# output will be written to a file. validate using allowed-amounts schema
-cms-mrf-validator validate my-data.json v1.0.0 -o results.txt -t allowed-amounts
+# basic usage, printing output directly and using the default in-network-rates schema with the version specified in the file
+cms-mrf-validator validate my-data.json
+# output will be written to a file. validate using specific version of allowed-amounts schema
+cms-mrf-validator validate my-data.json --schema-version v1.0.0 -o results.txt -t allowed-amounts
 ```
 
 Further details:
@@ -110,14 +110,15 @@ Further details:
 Validate a file against a specific published version of a CMS schema.
 
 Arguments:
-  data-file              path to data file to validate
-  schema-version         version of schema to use for validation
+  data-file                   path to data file to validate
 
 Options:
-  -o, --out <out>        output path
-  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents", default: "in-network-rates")
-  -s, --strict           enable strict checking, which prohibits additional properties in data file
-  -h, --help             display help for command
+  --schema-version <version>  version of schema to use for validation
+  -o, --out <out>             output path
+  -t, --target <schema>       name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents",
+                              default: "in-network-rates")
+  -s, --strict                enable strict checking, which prohibits additional properties in data file
+  -h, --help                  display help for command
 ```
 
 The purpose of the `strict` option is to help detect when an optional attribute has been spelled incorrectly. Because additional properties are allowed by the schema, a misspelled optional attribute does not normally cause a validation failure.
@@ -127,7 +128,7 @@ The purpose of the `strict` option is to help detect when an optional attribute 
 It is also possible to specify a URL to the file to validate. From the installed directory:
 
 ```
-cms-mrf-validator from-url <data-url> <schema-version> [-o out] [-t target]
+cms-mrf-validator from-url <data-url> [options]
 ```
 
 The only difference in arguments is that a URL should be provided instead of a path to a file. All options from the `validate` command still apply. The URL must return a file that is one of the following:
@@ -142,14 +143,15 @@ Further details:
 Validate the file retrieved from a URL against a specific published version of a CMS schema.
 
 Arguments:
-  data-url               URL to data file to validate
-  schema-version         version of schema to use for validation
+  data-url                    URL to data file to validate
 
 Options:
-  -o, --out <out>        output path
-  -t, --target <schema>  name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents", default: "in-network-rates")
-  -s, --strict           enable strict checking, which prohibits additional properties in data file
-  -h, --help             display help for command
+  --schema-version <version>  version of schema to use for validation
+  -o, --out <out>             output path
+  -t, --target <schema>       name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents",
+                              default: "in-network-rates")
+  -s, --strict                enable strict checking, which prohibits additional properties in data file
+  -h, --help                  display help for command
 ```
 
 ### Test file validation
@@ -161,7 +163,7 @@ Running the command from the root of the project:
 #### Running a valid file:
 
 ```bash
-cms-mrf-validator validate test-files/in-network-rates-fee-for-service-sample.json v1.0.0
+cms-mrf-validator validate test-files/in-network-rates-fee-for-service-sample.json --schema-version v1.0.0
 ```
 
 Output:
@@ -173,7 +175,7 @@ Input JSON is valid.
 #### Running an invalid file:
 
 ```bash
-cms-mrf-validator validate test-files/allowed-amounts-error.json v1.0.0 -t allowed-amounts
+cms-mrf-validator validate test-files/allowed-amounts-error.json --schema-version v1.0.0 -t allowed-amounts
 ```
 
 Output:
