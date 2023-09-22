@@ -113,7 +113,8 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
     })
       .then(response => {
         const contentType = response.headers['content-type'] ?? 'application/octet-stream';
-        if (isZip(contentType, url)) {
+        const finalUrl = response.request.path;
+        if (isZip(contentType, finalUrl)) {
           // zips require additional work to find a JSON file inside
           const zipPath = path.join(folder, 'data.zip');
           const zipOutputStream = fs.createWriteStream(zipPath);
@@ -172,7 +173,7 @@ export async function downloadDataFile(url: string, folder: string): Promise<str
             reject('Error writing downloaded file.');
           });
 
-          if (isGzip(contentType, url)) {
+          if (isGzip(contentType, finalUrl)) {
             pipeline(response.data, createGunzip(), outputStream);
           } else {
             response.data.pipe(outputStream);
