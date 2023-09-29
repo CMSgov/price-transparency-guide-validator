@@ -5,7 +5,7 @@ import util from 'util';
 import { config } from './utils';
 import temp from 'temp';
 import { logger } from './logger';
-import JSONStream from 'JSONStream';
+import { JSONParser } from '@streamparser/json-node';
 
 export class SchemaManager {
   private _version: string;
@@ -82,14 +82,14 @@ export class SchemaManager {
 
   async determineVersion(dataFile: string): Promise<string> {
     logger.debug(`Detecting version for ${dataFile}`);
-    const parser = JSONStream.parse('version');
+    const parser = new JSONParser({ paths: ['$.version'], keepStack: false });
     const dataStream = fs.createReadStream(dataFile);
     let foundVersion = '';
 
     return new Promise((resolve, reject) => {
-      parser.on('data', (data: any) => {
-        if (typeof data === 'string') {
-          foundVersion = data;
+      parser.on('data', data => {
+        if (typeof data.value === 'string') {
+          foundVersion = data.value;
         }
         dataStream.unpipe();
         dataStream.destroy();
@@ -104,7 +104,11 @@ export class SchemaManager {
         }
       });
       parser.on('error', () => {
-        reject('Parse error when detecting version.');
+        // an error gets thrown when closing the stream early, but that's not an actual problem.
+        // it'll get handled in the close event
+        if (!foundVersion) {
+          reject('Parse error when detecting version.');
+        }
       });
       dataStream.pipe(parser);
     });
