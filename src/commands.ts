@@ -99,6 +99,10 @@ export async function validate(dataFile: string, options: OptionValues) {
         process.exitCode = 1;
       }
       temp.cleanupSync();
+    })
+    .catch(err => {
+      logger.error(err.message);
+      process.exitCode = 1;
     });
 }
 
@@ -175,6 +179,10 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
           logger.error('No schema available - not validating.');
           process.exitCode = 1;
         }
+      })
+      .catch(err => {
+        logger.error(err.message);
+        process.exitCode = 1;
       });
   } else {
     logger.info('Exiting.');
