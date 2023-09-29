@@ -188,6 +188,45 @@ describe('DownloadManager', () => {
       expect(downloadedData).toEqual(simpleData);
     });
 
+    it('should write a decompressed gz file when the response has content type application/octet-stream and the url after redirection ends with .gz', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleGz = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleData.gz'));
+      nock('http://example.org')
+        .get('/some-data')
+        .reply(302, '', { Location: 'http://example.org/data.gz' });
+      nock('http://example.org')
+        .get('/data.gz')
+        .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
+      const outputDir = temp.mkdirSync();
+      await downloadManager.downloadDataFile('http://example.org/some-data', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should write a decompressed gz file when the response has content type application/octet-stream and the url after redirection ends with .gz followed by a query string', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleGz = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleData.gz'));
+      nock('http://example.org')
+        .get('/some-data')
+        .reply(302, '', { Location: 'http://example.org/data.gz?Expires=123456&mode=true' });
+      nock('http://example.org')
+        .get('/data.gz')
+        .query(true)
+        .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
+      const outputDir = temp.mkdirSync();
+      await downloadManager.downloadDataFile('http://example.org/some-data', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
     it('should write a json file within a zip to the specified folder', async () => {
       const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
@@ -257,6 +296,44 @@ describe('DownloadManager', () => {
       expect(zipInfo.jsonEntries).toHaveLength(2);
       expect(zipInfo.jsonEntries[0].fileName).toBe('moreData.json');
       expect(zipInfo.jsonEntries[1].fileName).toBe('simpleData.json');
+    });
+    it('should write a json file within a zip when the response has content type application/octet-stream and the url after redirection ends with .zip', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleZip.zip'));
+      nock('http://example.org')
+        .get('/data-please')
+        .reply(302, '', { Location: 'http://example.org/data.zip' });
+      nock('http://example.org')
+        .get('/data.zip')
+        .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
+      const outputDir = temp.mkdirSync();
+      await downloadManager.downloadDataFile('http://example.org/data-please', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
+    it('should write a json file within a zip when the response has content type application/octet-stream and the url after redirection ends with .zip followed by a query string', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleZip.zip'));
+      nock('http://example.org')
+        .get('/data-please')
+        .reply(302, '', { Location: 'http://example.org/data.zip?mode=on&rate=7' });
+      nock('http://example.org')
+        .get('/data.zip')
+        .query(true)
+        .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
+      const outputDir = temp.mkdirSync();
+      await downloadManager.downloadDataFile('http://example.org/data-please', outputDir);
+      expect(fs.existsSync(path.join(outputDir, 'data.json')));
+      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
     });
 
     it('should reject when a zip contains no json files', async () => {

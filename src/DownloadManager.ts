@@ -87,7 +87,8 @@ export class DownloadManager {
       })
         .then(response => {
           const contentType = response.headers['content-type'] ?? 'application/octet-stream';
-          if (isZip(contentType, url)) {
+          const finalUrl = response.request.path;
+          if (isZip(contentType, finalUrl)) {
             // zips require additional work to find a JSON file inside
             const zipPath = path.join(folder, 'data.zip');
             const zipOutputStream = fs.createWriteStream(zipPath);
@@ -146,7 +147,7 @@ export class DownloadManager {
               reject('Error writing downloaded file.');
             });
 
-            if (isGzip(contentType, url)) {
+            if (isGzip(contentType, finalUrl)) {
               pipeline(response.data, createGunzip(), outputStream);
             } else {
               response.data.pipe(outputStream);
