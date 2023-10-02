@@ -7,6 +7,8 @@ import temp from 'temp';
 import { logger } from './logger';
 import { JSONParser } from '@streamparser/json-node';
 
+const VERSION_TIME_LIMIT = 3000; // three seconds
+
 export class SchemaManager {
   private _version: string;
   private storageDirectory: string;
@@ -81,36 +83,102 @@ export class SchemaManager {
   }
 
   async determineVersion(dataFile: string): Promise<string> {
-    logger.debug(`Detecting version for ${dataFile}`);
-    const parser = new JSONParser({ paths: ['$.version'], keepStack: false });
-    const dataStream = fs.createReadStream(dataFile);
-    let foundVersion = '';
-
     return new Promise((resolve, reject) => {
-      parser.on('data', data => {
-        if (typeof data.value === 'string') {
-          foundVersion = data.value;
-        }
-        dataStream.unpipe();
-        dataStream.destroy();
-        parser.end();
+      logger.debug(`Detecting version for ${dataFile}`);
+      const parser = new JSONParser({ paths: ['$.version'], keepStack: false });
+      const dataStream = fs.createReadStream(dataFile);
+      let foundVersion = '';
+
+      let forwardReject: (reason?: any) => void;
+      const forwardSearch = new Promise<string>((resolve, reject) => {
+        forwardReject = reject;
+        parser.on('data', data => {
+          if (typeof data.value === 'string') {
+            foundVersion = data.value;
+          }
+          dataStream.unpipe();
+          dataStream.destroy();
+          parser.end();
+        });
+        parser.on('close', () => {
+          if (foundVersion) {
+            logger.debug(`Found version: ${foundVersion}`);
+            resolve(foundVersion);
+          } else {
+            reject('No version property available.');
+          }
+        });
+        parser.on('error', () => {
+          // an error gets thrown when closing the stream early, but that's not an actual problem.
+          // it'll get handled in the close event
+          if (!foundVersion) {
+            reject('Parse error when detecting version.');
+          }
+        });
+        dataStream.pipe(parser);
       });
-      parser.on('close', () => {
-        if (foundVersion) {
-          logger.debug(`Found version: ${foundVersion}`);
+
+      let backwardReject: (reason?: any) => void;
+      const backwardSearch = new Promise<string>((resolve, reject) => {
+        backwardReject = reject;
+        fs.promises
+          .open(dataFile, 'r')
+          .then(async fileHandle => {
+            try {
+              const stats = await fileHandle.stat();
+              const lastStuff = await fileHandle.read({
+                position: Math.max(0, stats.size - 100),
+                length: 100
+              });
+              if (lastStuff.bytesRead > 0) {
+                const lastText = lastStuff.buffer.toString('utf-8');
+                const versionRegex = /"version"\s*:\s*("(?:\\"|\\\\|[^"])*")/;
+                const versionMatch = lastText.match(versionRegex);
+                if (versionMatch) {
+                  const foundVersion = JSON.parse(versionMatch[1]);
+                  logger.debug(`Found version during backwards search: ${foundVersion}`);
+                  resolve(foundVersion);
+                } else {
+                  reject('No version found during backwards search');
+                }
+              } else {
+                reject('No bytes read during backwards search');
+              }
+            } finally {
+              fileHandle.close();
+            }
+          })
+          .catch(err => {
+            logger.debug(`Something went wrong during backwards search: ${err}`);
+            reject('Something went wrong during backwards search');
+          });
+      });
+
+      const timeLimit = setTimeout(() => {
+        logger.debug('Could not find version within time limit.');
+        if (forwardReject) {
+          forwardReject('Forward timeout cancellation');
+        }
+        if (backwardReject) {
+          backwardReject('Backward timeout cancellation');
+        }
+        reject('Could not find version within time limit.');
+      }, VERSION_TIME_LIMIT);
+
+      Promise.any([forwardSearch, backwardSearch])
+        .then(foundVersion => {
           resolve(foundVersion);
-        } else {
-          reject('No version property available.');
-        }
-      });
-      parser.on('error', () => {
-        // an error gets thrown when closing the stream early, but that's not an actual problem.
-        // it'll get handled in the close event
-        if (!foundVersion) {
-          reject('Parse error when detecting version.');
-        }
-      });
-      dataStream.pipe(parser);
+        })
+        .catch(() => {
+          reject();
+        })
+        .finally(() => {
+          logger.debug('Cleaning up from version search.');
+          clearTimeout(timeLimit);
+          dataStream.unpipe();
+          dataStream.destroy();
+          parser.end();
+        });
     });
   }
 }
