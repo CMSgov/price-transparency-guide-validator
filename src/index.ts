@@ -22,9 +22,9 @@ async function main() {
     })
     .command('validate')
     .description('Validate a file against a specific published version of a CMS schema.')
-    .usage('<data-file> <schema-version> [options]')
+    .usage('<data-file> [options]')
     .argument('<data-file>', 'path to data file to validate')
-    .argument('<schema-version>', 'version of schema to use for validation')
+    .option('--schema-version <version>', 'version of schema to use for validation')
     .option('-o, --out <out>', 'output path')
     .addOption(
       new Option('-t, --target <schema>', 'name of schema to use')
@@ -42,9 +42,9 @@ async function main() {
     .description(
       'Validate the file retrieved from a URL against a specific published version of a CMS schema.'
     )
-    .usage('<data-url> <schema-version> [options]')
+    .usage('<data-url> [options]')
     .argument('<data-url>', 'URL to data file to validate')
-    .argument('<schema-version>', 'version of schema to use for validation')
+    .option('--schema-version <version>', 'version of schema to use for validation')
     .option('-o, --out <out>', 'output path')
     .addOption(
       new Option('-t, --target <schema>', 'name of schema to use')
@@ -55,8 +55,8 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
-    .action((dataUrl, schemaVersion, options) => {
-      validateFromUrl(dataUrl, schemaVersion, options).then(result => {
+    .action((dataUrl, options) => {
+      validateFromUrl(dataUrl, options).then(result => {
         if (result) {
           process.exitCode = 0;
         } else {

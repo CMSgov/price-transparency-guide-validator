@@ -28,39 +28,27 @@ describe('commands', () => {
     });
 
     it('should continue processing when the data file exists', async () => {
-      await validate(
-        path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'),
-        'schema version 278',
-        { target: null }
-      );
+      await validate(path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'), {
+        target: null
+      });
       expect(useVersionSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should not continue processing when the data file does not exist', async () => {
-      await validate(
-        path.join(__dirname, '..', 'test-files', 'not-real.json'),
-        'schema version 8',
-        { target: null }
-      );
+      await validate(path.join(__dirname, '..', 'test-files', 'not-real.json'), { target: null });
       expect(useVersionSpy).toHaveBeenCalledTimes(0);
     });
 
     it('should run the container when the requested schema is available', async () => {
       useSchemaSpy.mockResolvedValueOnce('good.json');
-      await validate(
-        path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'),
-        'schema version 278',
-        { target: null }
-      );
+      await validate(path.join(__dirname, '..', 'test-files', 'allowed-amounts.json'), {
+        target: null
+      });
       expect(runContainerSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should not run the container when the requested schema is not available', async () => {
-      await validate(
-        path.join(__dirname, '..', 'test-files', 'not-real.json'),
-        'schema version 278',
-        { target: null }
-      );
+      await validate(path.join(__dirname, '..', 'test-files', 'not-real.json'), { target: null });
       expect(runContainerSpy).toHaveBeenCalledTimes(0);
     });
 
@@ -99,13 +87,13 @@ describe('commands', () => {
 
     it('should continue processing when the data url is valid and content length is less than or equal to the size limit', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
-      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
+      await validateFromUrl('http://example.org/data.json', { schemaVersion: 'v1.0.0' });
       expect(useSchemaSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should not continue processing when the data url is invalid', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(false);
-      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
+      await validateFromUrl('http://example.org/data.json', { schemaVersion: 'v1.0.0' });
       expect(useSchemaSpy).toHaveBeenCalledTimes(0);
     });
 
@@ -113,8 +101,9 @@ describe('commands', () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
       useSchemaSpy.mockResolvedValueOnce('schemapath.json');
       downloadDataSpy.mockResolvedValueOnce('data.json');
-      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {
-        target: 'in-network-rates'
+      await validateFromUrl('http://example.org/data.json', {
+        target: 'in-network-rates',
+        schemaVersion: 'v1.0.0'
       });
       expect(downloadDataSpy).toHaveBeenCalledTimes(1);
       expect(downloadDataSpy).toHaveBeenCalledWith(
@@ -133,7 +122,7 @@ describe('commands', () => {
     it('should not download the data file when the requested schema is not available', async () => {
       checkDataUrlSpy.mockResolvedValueOnce(true);
       useSchemaSpy.mockResolvedValueOnce(null);
-      await validateFromUrl('http://example.org/data.json', 'v1.0.0', {});
+      await validateFromUrl('http://example.org/data.json', { schemaVersion: 'v1.0.0' });
       expect(downloadDataSpy).toHaveBeenCalledTimes(0);
     });
 
