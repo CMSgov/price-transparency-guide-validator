@@ -8,6 +8,7 @@ import { logger } from './logger';
 import { JSONParser } from '@streamparser/json-node';
 
 const VERSION_TIME_LIMIT = 3000; // three seconds
+const BACKWARDS_BYTES = 1000; // read the last 1000 bytes during backwards search
 
 export class SchemaManager {
   private _version: string;
@@ -127,8 +128,8 @@ export class SchemaManager {
             try {
               const stats = await fileHandle.stat();
               const lastStuff = await fileHandle.read({
-                position: Math.max(0, stats.size - 100),
-                length: 100
+                position: Math.max(0, stats.size - BACKWARDS_BYTES),
+                length: BACKWARDS_BYTES
               });
               if (lastStuff.bytesRead > 0) {
                 const lastText = lastStuff.buffer.toString('utf-8');
