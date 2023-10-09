@@ -118,6 +118,7 @@ Options:
   -t, --target <schema>       name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents",
                               default: "in-network-rates")
   -s, --strict                enable strict checking, which prohibits additional properties in data file
+  -y, --yes-all               automatically respond "yes" to confirmation prompts
   -h, --help                  display help for command
 ```
 
@@ -151,6 +152,7 @@ Options:
   -t, --target <schema>       name of schema to use (choices: "allowed-amounts", "in-network-rates", "provider-reference", "table-of-contents",
                               default: "in-network-rates")
   -s, --strict                enable strict checking, which prohibits additional properties in data file
+  -y, --yes-all               automatically respond "yes" to confirmation prompts
   -h, --help                  display help for command
 ```
 

@@ -170,7 +170,7 @@ export async function assessTocContents(
       logger.info('== Allowed Amounts ==');
       locations.allowedAmount.forEach(aaf => logger.info(`* ${aaf}`));
     }
-    const wantToValidateContents = readlineSync.keyInYNStrict(
+    const wantToValidateContents = downloadManager.alwaysYes || readlineSync.keyInYNStrict(
       `Would you like to validate ${fileText}?`
     );
     if (wantToValidateContents) {
@@ -471,7 +471,7 @@ export async function assessReferencedProviders(
       logger.info(`In-network file(s) refer to ${fileText}:`);
       logger.info('== Provider Reference ==');
       providerReferences.forEach(prf => logger.info(`* ${prf}`));
-      const wantToValidateProviders = readlineSync.keyInYNStrict(
+      const wantToValidateProviders = downloadManager.alwaysYes || readlineSync.keyInYNStrict(
         `Would you like to validate ${fileText}?`
       );
       if (wantToValidateProviders) {

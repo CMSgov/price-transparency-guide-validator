@@ -35,7 +35,7 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
-    .option('-y, --yes-all', 'automatically respond "yes" to download confirmation prompts')
+    .option('-y, --yes-all', 'automatically respond "yes" to confirmation prompts')
     .action(validate);
 
   program
@@ -56,7 +56,7 @@ async function main() {
       '-s, --strict',
       'enable strict checking, which prohibits additional properties in data file'
     )
-    .option('-y, --yes-all', 'automatically respond "yes" to download confirmation prompts')
+    .option('-y, --yes-all', 'automatically respond "yes" to confirmation prompts')
     .action((dataUrl, options) => {
       validateFromUrl(dataUrl, options).then(result => {
         if (result) {
