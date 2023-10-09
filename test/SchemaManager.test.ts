@@ -103,16 +103,14 @@ describe('SchemaManager', () => {
       (child_process.exec as jest.Mocked<typeof child_process_real.exec>).mockRestore();
     });
 
-    it('should return true when the version exists in the repo', async () => {
+    it('should resolve to true when the version exists in the repo', async () => {
       const schemaManager = new SchemaManager(repoDirectory);
-      const result = await schemaManager.useVersion('v0.7');
-      expect(result).toBeDefined();
+      await expect(schemaManager.useVersion('v0.7')).resolves.toBe(true);
     });
 
-    it('should return false when the version does not exist in the repo', async () => {
+    it('should reject when the version does not exist in the repo', async () => {
       const schemaManager = new SchemaManager(repoDirectory);
-      const result = await schemaManager.useVersion('v0.6');
-      expect(result).toBeFalse();
+      await expect(schemaManager.useVersion('v0.6')).toReject();
     });
   });
 
@@ -161,6 +159,26 @@ describe('SchemaManager', () => {
       await schemaManager.useVersion('v0.7');
       const result = await schemaManager.useSchema('something-else');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('#determineVersion', () => {
+    it('should resolve to the value of the version property when it exists and is a string', async () => {
+      const dataPath = path.join(__dirname, 'fixtures', 'dataWithVersion.json');
+      const schemaManager = new SchemaManager();
+      await expect(schemaManager.determineVersion(dataPath)).resolves.toBe('1.2.0');
+    });
+
+    it('should reject when the version property does not exist', async () => {
+      const dataPath = path.join(__dirname, 'fixtures', 'dataWithoutVersion.json');
+      const schemaManager = new SchemaManager();
+      await expect(schemaManager.determineVersion(dataPath)).toReject();
+    });
+
+    it('should reject when the version property exists, but is not a string', async () => {
+      const dataPath = path.join(__dirname, 'fixtures', 'dataNonStringVersion.json');
+      const schemaManager = new SchemaManager();
+      await expect(schemaManager.determineVersion(dataPath)).toReject();
     });
   });
 });

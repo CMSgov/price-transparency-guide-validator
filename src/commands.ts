@@ -18,7 +18,7 @@ import { DockerManager } from './DockerManager';
 import { logger } from './logger';
 import { DownloadManager } from './DownloadManager';
 
-export async function validate(dataFile: string, schemaVersion: string, options: OptionValues) {
+export async function validate(dataFile: string, options: OptionValues) {
   // check to see if supplied json file exists
   if (!fs.existsSync(dataFile)) {
     logger.error(`Could not find data file: ${dataFile}`);
@@ -28,8 +28,30 @@ export async function validate(dataFile: string, schemaVersion: string, options:
   const schemaManager = new SchemaManager();
   await schemaManager.ensureRepo();
   schemaManager.strict = options.strict;
+  schemaManager.shouldDetectVersion = options.schemaVersion == null;
+  let versionToUse: string;
+  try {
+    const detectedVersion = await schemaManager.determineVersion(dataFile);
+    if (!schemaManager.shouldDetectVersion && detectedVersion != options.schemaVersion) {
+      logger.warn(
+        `Schema version ${options.schemaVersion} was provided, but file indicates it conforms to schema version ${detectedVersion}. ${options.schemaVersion} will be used.`
+      );
+    }
+    versionToUse = schemaManager.shouldDetectVersion ? detectedVersion : options.schemaVersion;
+  } catch (err) {
+    if (!schemaManager.shouldDetectVersion) {
+      versionToUse = options.schemaVersion;
+    } else {
+      // or maybe use the minimum.
+      logger.error(
+        'Data file does not contain version information. Please run again using the --schema-version option to specify a version.'
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
   return schemaManager
-    .useVersion(schemaVersion)
+    .useVersion(versionToUse)
     .then(versionIsAvailable => {
       if (versionIsAvailable) {
         return schemaManager.useSchema(options.target);
@@ -79,14 +101,14 @@ export async function validate(dataFile: string, schemaVersion: string, options:
         process.exitCode = 1;
       }
       temp.cleanupSync();
+    })
+    .catch(err => {
+      logger.error(err.message);
+      process.exitCode = 1;
     });
 }
 
-export async function validateFromUrl(
-  dataUrl: string,
-  schemaVersion: string,
-  options: OptionValues
-) {
+export async function validateFromUrl(dataUrl: string, options: OptionValues) {
   temp.track();
   const downloadManager = new DownloadManager(options.yesAll);
   if (await downloadManager.checkDataUrl(dataUrl)) {
@@ -94,7 +116,7 @@ export async function validateFromUrl(
     await schemaManager.ensureRepo();
     schemaManager.strict = options.strict;
     return schemaManager
-      .useVersion(schemaVersion)
+      .useVersion(options.schemaVersion)
       .then(versionIsAvailable => {
         if (versionIsAvailable) {
           return schemaManager.useSchema(options.target);
@@ -157,6 +179,10 @@ export async function validateFromUrl(
           logger.error('No schema available - not validating.');
           process.exitCode = 1;
         }
+      })
+      .catch(err => {
+        logger.error(err.message);
+        process.exitCode = 1;
       });
   } else {
     logger.info('Exiting.');
