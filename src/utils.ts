@@ -154,8 +154,7 @@ export async function assessTocContents(
   locations: ContainerResult['locations'],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  outputPath: string
+  downloadManager: DownloadManager
 ): Promise<string[]> {
   const totalFileCount =
     (locations?.inNetwork?.length ?? 0) + (locations?.allowedAmount?.length ?? 0);
@@ -170,17 +169,16 @@ export async function assessTocContents(
       logger.info('== Allowed Amounts ==');
       locations.allowedAmount.forEach(aaf => logger.info(`* ${aaf}`));
     }
-    const wantToValidateContents = downloadManager.alwaysYes || readlineSync.keyInYNStrict(
-      `Would you like to validate ${fileText}?`
-    );
+    const wantToValidateContents =
+      downloadManager.alwaysYes ||
+      readlineSync.keyInYNStrict(`Would you like to validate ${fileText}?`);
     if (wantToValidateContents) {
       const providerReferences = await validateTocContents(
         locations.inNetwork ?? [],
         locations.allowedAmount ?? [],
         schemaManager,
         dockerManager,
-        downloadManager,
-        outputPath
+        downloadManager
       );
       return providerReferences;
     }
@@ -193,12 +191,11 @@ export async function validateTocContents(
   allowedAmount: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  outputPath: string
+  downloadManager: DownloadManager
 ): Promise<string[]> {
   temp.track();
   let tempOutput = '';
-  if (outputPath?.length > 0) {
+  if (dockerManager.outputPath?.length > 0) {
     tempOutput = path.join(temp.mkdirSync('contents'), 'contained-result');
   }
   let providerReferences: Set<string>;
@@ -209,7 +206,6 @@ export async function validateTocContents(
         schemaManager,
         dockerManager,
         downloadManager,
-        outputPath,
         tempOutput
       );
     } else {
@@ -218,7 +214,6 @@ export async function validateTocContents(
         schemaManager,
         dockerManager,
         downloadManager,
-        outputPath,
         tempOutput
       );
     }
@@ -230,7 +225,6 @@ export async function validateTocContents(
         schemaManager,
         dockerManager,
         downloadManager,
-        outputPath,
         tempOutput
       );
     } else {
@@ -239,7 +233,6 @@ export async function validateTocContents(
         schemaManager,
         dockerManager,
         downloadManager,
-        outputPath,
         tempOutput
       );
     }
@@ -252,7 +245,6 @@ async function validateInNetworkFixedVersion(
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
   downloadManager: DownloadManager,
-  outputPath: string,
   tempOutput: string
 ) {
   const providerReferences: Set<string> = new Set<string>();
@@ -291,7 +283,11 @@ async function validateInNetworkFixedVersion(
                 );
               }
               if (tempOutput.length > 0) {
-                appendResults(tempOutput, outputPath, `${dataUrl} - in-network${EOL}`);
+                appendResults(
+                  tempOutput,
+                  dockerManager.outputPath,
+                  `${dataUrl} - in-network${EOL}`
+                );
               }
             }
           } else {
@@ -313,7 +309,6 @@ async function validateInNetworkDetectedVersion(
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
   downloadManager: DownloadManager,
-  outputPath: string,
   tempOutput: string
 ) {
   const providerReferences: Set<string> = new Set<string>();
@@ -353,7 +348,11 @@ async function validateInNetworkDetectedVersion(
                 );
               }
               if (tempOutput.length > 0) {
-                appendResults(tempOutput, outputPath, `${dataUrl} - in-network${EOL}`);
+                appendResults(
+                  tempOutput,
+                  dockerManager.outputPath,
+                  `${dataUrl} - in-network${EOL}`
+                );
               }
             });
         }
@@ -370,7 +369,6 @@ async function validateAllowedAmountsFixedVersion(
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
   downloadManager: DownloadManager,
-  outputPath: string,
   tempOutput: string
 ) {
   await schemaManager.useSchema('allowed-amounts').then(async schemaPath => {
@@ -395,7 +393,11 @@ async function validateAllowedAmountsFixedVersion(
                 .catch(() => {});
               await dockerManager.runContainer(schemaPath, 'allowed-amounts', dataPath, tempOutput);
               if (tempOutput.length > 0) {
-                appendResults(tempOutput, outputPath, `${dataUrl} - allowed-amounts${EOL}`);
+                appendResults(
+                  tempOutput,
+                  dockerManager.outputPath,
+                  `${dataUrl} - allowed-amounts${EOL}`
+                );
               }
             }
           } else {
@@ -416,7 +418,6 @@ async function validateAllowedAmountsDetectedVersion(
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
   downloadManager: DownloadManager,
-  outputPath: string,
   tempOutput: string
 ) {
   for (const dataUrl of allowedAmount) {
@@ -447,7 +448,11 @@ async function validateAllowedAmountsDetectedVersion(
             })
             .then(_containedResult => {
               if (tempOutput.length > 0) {
-                appendResults(tempOutput, outputPath, `${dataUrl} - allowed-amounts${EOL}`);
+                appendResults(
+                  tempOutput,
+                  dockerManager.outputPath,
+                  `${dataUrl} - allowed-amounts${EOL}`
+                );
               }
             });
         }
@@ -471,9 +476,9 @@ export async function assessReferencedProviders(
       logger.info(`In-network file(s) refer to ${fileText}:`);
       logger.info('== Provider Reference ==');
       providerReferences.forEach(prf => logger.info(`* ${prf}`));
-      const wantToValidateProviders = downloadManager.alwaysYes || readlineSync.keyInYNStrict(
-        `Would you like to validate ${fileText}?`
-      );
+      const wantToValidateProviders =
+        downloadManager.alwaysYes ||
+        readlineSync.keyInYNStrict(`Would you like to validate ${fileText}?`);
       if (wantToValidateProviders) {
         await validateReferencedProviders(
           providerReferences,

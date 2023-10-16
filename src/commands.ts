@@ -73,8 +73,7 @@ export async function validate(dataFile: string, options: OptionValues) {
               containerResult.locations,
               schemaManager,
               dockerManager,
-              downloadManager,
-              options.out
+              downloadManager
             );
             await assessReferencedProviders(
               providerReferences,
@@ -138,8 +137,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                   containerResult.locations,
                   schemaManager,
                   dockerManager,
-                  downloadManager,
-                  options.out
+                  downloadManager
                 );
                 await assessReferencedProviders(
                   providerReferences,
