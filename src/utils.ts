@@ -467,8 +467,7 @@ export async function assessReferencedProviders(
   providerReferences: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  outputPath: string
+  downloadManager: DownloadManager
 ) {
   if (providerReferences.length > 0) {
     const fileText = providerReferences.length === 1 ? 'this file' : 'these files';
@@ -484,8 +483,7 @@ export async function assessReferencedProviders(
           providerReferences,
           schemaManager,
           dockerManager,
-          downloadManager,
-          outputPath
+          downloadManager
         );
       }
     }
@@ -496,12 +494,11 @@ export async function validateReferencedProviders(
   providerReferences: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  outputPath: string
+  downloadManager: DownloadManager
 ) {
   temp.track();
   let tempOutput = '';
-  if (outputPath?.length > 0) {
+  if (dockerManager.outputPath?.length > 0) {
     tempOutput = path.join(temp.mkdirSync('providers'), 'contained-result');
   }
   if (providerReferences.length > 0) {
@@ -520,7 +517,11 @@ export async function validateReferencedProviders(
                   tempOutput
                 );
                 if (tempOutput.length > 0) {
-                  appendResults(tempOutput, outputPath, `${dataUrl} - provider-reference${EOL}`);
+                  appendResults(
+                    tempOutput,
+                    dockerManager.outputPath,
+                    `${dataUrl} - provider-reference${EOL}`
+                  );
                 }
               }
             } else {

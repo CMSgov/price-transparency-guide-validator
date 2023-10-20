@@ -79,8 +79,7 @@ export async function validate(dataFile: string, options: OptionValues) {
               providerReferences,
               schemaManager,
               dockerManager,
-              downloadManager,
-              options.out
+              downloadManager
             );
           } else if (
             options.target === 'in-network-rates' &&
@@ -90,8 +89,7 @@ export async function validate(dataFile: string, options: OptionValues) {
               containerResult.locations.providerReference,
               schemaManager,
               dockerManager,
-              downloadManager,
-              options.out
+              downloadManager
             );
           }
         }
@@ -143,8 +141,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                   providerReferences,
                   schemaManager,
                   dockerManager,
-                  downloadManager,
-                  options.out
+                  downloadManager
                 );
               } else if (
                 options.target === 'in-network-rates' &&
@@ -154,8 +151,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                   containerResult.locations.providerReference,
                   schemaManager,
                   dockerManager,
-                  downloadManager,
-                  options.out
+                  downloadManager
                 );
               }
             }
