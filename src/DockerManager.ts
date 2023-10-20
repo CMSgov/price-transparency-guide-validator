@@ -8,7 +8,7 @@ import { logger } from './logger';
 export class DockerManager {
   containerId = '';
 
-  constructor() {}
+  constructor(public outputPath = '') {}
 
   private async initContainerId(): Promise<void> {
     this.containerId = await util
@@ -24,7 +24,7 @@ export class DockerManager {
     schemaPath: string,
     schemaName: string,
     dataPath: string,
-    outputPath: string
+    outputPath = this.outputPath
   ): Promise<ContainerResult> {
     try {
       if (this.containerId.length === 0) {
@@ -42,11 +42,8 @@ export class DockerManager {
         logger.debug(runCommand);
         return util
           .promisify(exec)(runCommand)
-          .then(result => {
+          .then(() => {
             const containerResult: ContainerResult = { pass: true };
-            if (outputPath && fs.existsSync(containerOutputPath)) {
-              fs.copySync(containerOutputPath, outputPath);
-            }
             if (fs.existsSync(containerOutputPath)) {
               if (outputPath) {
                 fs.copySync(containerOutputPath, outputPath);
@@ -64,10 +61,7 @@ export class DockerManager {
             }
             return containerResult;
           })
-          .catch(reason => {
-            if (outputPath && fs.existsSync(path.join(outputDir, 'output.txt'))) {
-              fs.copySync(path.join(outputDir, 'output.txt'), outputPath);
-            }
+          .catch(() => {
             if (fs.existsSync(containerOutputPath)) {
               if (outputPath) {
                 fs.copySync(containerOutputPath, outputPath);
@@ -115,6 +109,7 @@ export class DockerManager {
 
 export type ContainerResult = {
   pass: boolean;
+  text?: string;
   locations?: {
     inNetwork?: string[];
     allowedAmount?: string[];

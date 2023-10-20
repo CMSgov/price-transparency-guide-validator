@@ -4,12 +4,20 @@ import temp from 'temp';
 import nock from 'nock';
 import readlineSync from 'readline-sync';
 import fs from 'fs-extra';
+import yauzl from 'yauzl';
+import { DownloadManager } from '../src/DownloadManager';
+import { ZipContents } from '../src/utils';
 
-import * as validatorUtils from '../src/utils';
+describe('DownloadManager', () => {
+  let downloadManager: DownloadManager;
 
-describe('utils', () => {
   beforeAll(() => {
     temp.track();
+    downloadManager = new DownloadManager();
+  });
+
+  beforeEach(() => {
+    downloadManager.alwaysYes = false;
   });
 
   describe('#checkDataUrl', () => {
@@ -29,7 +37,7 @@ describe('utils', () => {
 
     it('should return true when the url is valid and the content length is less than one GB', async () => {
       nock('http://example.org').head('/data.json').reply(200, '', { 'content-length': '500' });
-      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
       expect(result).toBeTrue();
     });
 
@@ -38,7 +46,16 @@ describe('utils', () => {
         .head('/data.json')
         .reply(200, '', { 'content-length': (Math.pow(1024, 3) * 2).toString() });
       keyInYNStrictSpy.mockReturnValueOnce(true);
-      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeTrue();
+    });
+
+    it('should return true when the url is valid and and alwaysYes is true with a content length greater than one GB', async () => {
+      nock('http://example.org')
+        .head('/data.json')
+        .reply(200, '', { 'content-length': (Math.pow(1024, 3) * 2).toString() });
+      downloadManager.alwaysYes = true;
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
       expect(result).toBeTrue();
     });
 
@@ -47,27 +64,34 @@ describe('utils', () => {
         .head('/data.json')
         .reply(200, '', { 'content-length': (Math.pow(1024, 3) * 2).toString() });
       keyInYNStrictSpy.mockReturnValueOnce(false);
-      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
       expect(result).toBeFalse();
     });
 
     it('should return true when the url is valid and the user approves an unknown content length', async () => {
       nock('http://example.org').head('/data.json').reply(200);
       keyInYNStrictSpy.mockReturnValueOnce(true);
-      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
+      expect(result).toBeTrue();
+    });
+
+    it('should return true when the url is valid and alwaysYes is true with an unknown content length', async () => {
+      nock('http://example.org').head('/data.json').reply(200);
+      downloadManager.alwaysYes = true;
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
       expect(result).toBeTrue();
     });
 
     it('should return false when the url is valid and the user rejects an unknown content length', async () => {
       nock('http://example.org').head('/data.json').reply(200);
       keyInYNStrictSpy.mockReturnValueOnce(false);
-      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
       expect(result).toBeFalse();
     });
 
     it('should return false when the url is not valid', async () => {
       nock('http://example.org').head('/data.json').reply(404);
-      const result = await validatorUtils.checkDataUrl('http://example.org/data.json');
+      const result = await downloadManager.checkDataUrl('http://example.org/data.json');
       expect(result).toBeFalse();
     });
   });
@@ -77,6 +101,21 @@ describe('utils', () => {
       nock.cleanAll();
     });
 
+    it('should write a file to the default folder', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      nock('http://example.org').get('/data.json').reply(200, simpleData);
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.json'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
     it('should write a file to the specified folder', async () => {
       const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
@@ -84,9 +123,13 @@ describe('utils', () => {
       );
       nock('http://example.org').get('/data.json').reply(200, simpleData);
       const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data.json', outputDir);
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.json',
+        outputDir
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
@@ -99,10 +142,12 @@ describe('utils', () => {
       nock('http://example.org')
         .get('/data.gz')
         .reply(200, simpleGz, { 'content-type': 'application/gzip' });
-      const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data.gz', outputDir);
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.gz'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
@@ -115,10 +160,12 @@ describe('utils', () => {
       nock('http://example.org')
         .get('/data.gz')
         .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
-      const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data.gz', outputDir);
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.gz'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
@@ -132,13 +179,12 @@ describe('utils', () => {
         .get('/data.gz')
         .query(true)
         .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
-      const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile(
-        'http://example.org/data.gz?Expires=123456&mode=true',
-        outputDir
-      );
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.gz?Expires=123456&mode=true'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
@@ -155,7 +201,7 @@ describe('utils', () => {
         .get('/data.gz')
         .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
       const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/some-data', outputDir);
+      await downloadManager.downloadDataFile('http://example.org/some-data', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
       const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
@@ -175,7 +221,7 @@ describe('utils', () => {
         .query(true)
         .reply(200, simpleGz, { 'content-type': 'application/octet-stream' });
       const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/some-data', outputDir);
+      await downloadManager.downloadDataFile('http://example.org/some-data', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
       const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
@@ -190,10 +236,12 @@ describe('utils', () => {
       nock('http://example.org')
         .get('/data.zip')
         .reply(200, simpleZip, { 'content-type': 'application/zip' });
-      const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir);
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.zip'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
@@ -206,10 +254,12 @@ describe('utils', () => {
       nock('http://example.org')
         .get('/data.zip')
         .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
-      const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir);
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.zip'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
@@ -223,16 +273,30 @@ describe('utils', () => {
         .get('/data.zip')
         .query(true)
         .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
-      const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile(
-        'http://example.org/data.zip?mode=on&rate=7',
-        outputDir
-      );
-      expect(fs.existsSync(path.join(outputDir, 'data.json')));
-      const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.zip?mode=on&rate=7'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
       expect(downloadedData).toEqual(simpleData);
     });
 
+    it('should return information about the zip contents when the zip has more than one json file', async () => {
+      const multiZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'multiZip.zip'));
+      nock('http://example.org')
+        .get('/multi.zip')
+        .query(true)
+        .reply(200, multiZip, { 'content-type': 'application/zip' });
+      const zipInfo = (await downloadManager.downloadDataFile(
+        'http://example.org/multi.zip?mode=more'
+      )) as ZipContents;
+      expect(zipInfo).toBeObject();
+      expect(zipInfo.zipFile).toBeInstanceOf(yauzl.ZipFile);
+      expect(zipInfo.jsonEntries).toHaveLength(2);
+      expect(zipInfo.jsonEntries[0].fileName).toBe('moreData.json');
+      expect(zipInfo.jsonEntries[1].fileName).toBe('simpleData.json');
+    });
     it('should write a json file within a zip when the response has content type application/octet-stream and the url after redirection ends with .zip', async () => {
       const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
@@ -246,7 +310,7 @@ describe('utils', () => {
         .get('/data.zip')
         .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
       const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data-please', outputDir);
+      await downloadManager.downloadDataFile('http://example.org/data-please', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
       const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
@@ -266,7 +330,7 @@ describe('utils', () => {
         .query(true)
         .reply(200, simpleZip, { 'content-type': 'application/octet-stream' });
       const outputDir = temp.mkdirSync();
-      await validatorUtils.downloadDataFile('http://example.org/data-please', outputDir);
+      await downloadManager.downloadDataFile('http://example.org/data-please', outputDir);
       expect(fs.existsSync(path.join(outputDir, 'data.json')));
       const downloadedData = fs.readJsonSync(path.join(outputDir, 'data.json'), 'utf-8');
       expect(downloadedData).toEqual(simpleData);
@@ -279,7 +343,7 @@ describe('utils', () => {
         .reply(200, wrongZip, { 'content-type': 'application/zip' });
       const outputDir = temp.mkdirSync();
       await expect(
-        validatorUtils.downloadDataFile('http://example.org/data.zip', outputDir)
+        downloadManager.downloadDataFile('http://example.org/data.zip', outputDir)
       ).toReject();
     });
 
@@ -287,7 +351,7 @@ describe('utils', () => {
       nock('http://example.org').get('/data.json').reply(500);
       const outputDir = temp.mkdirSync();
       await expect(
-        validatorUtils.downloadDataFile('http://example.org/data.json', outputDir)
+        downloadManager.downloadDataFile('http://example.org/data.json', outputDir)
       ).toReject();
     });
   });

@@ -7,8 +7,6 @@ import { OptionValues } from 'commander';
 
 import {
   config,
-  downloadDataFile,
-  checkDataUrl,
   chooseJsonFile,
   getEntryFromZip,
   assessTocContents,
@@ -18,6 +16,7 @@ import temp from 'temp';
 import { SchemaManager } from './SchemaManager';
 import { DockerManager } from './DockerManager';
 import { logger } from './logger';
+import { DownloadManager } from './DownloadManager';
 
 export async function validate(dataFile: string, options: OptionValues) {
   // check to see if supplied json file exists
@@ -61,12 +60,12 @@ export async function validate(dataFile: string, options: OptionValues) {
     .then(async schemaPath => {
       temp.track();
       if (schemaPath != null) {
-        const dockerManager = new DockerManager();
+        const dockerManager = new DockerManager(options.out);
+        const downloadManager = new DownloadManager(options.yesAll);
         const containerResult = await dockerManager.runContainer(
           schemaPath,
           options.target,
-          dataFile,
-          options.out
+          dataFile
         );
         if (containerResult.pass) {
           if (options.target === 'table-of-contents') {
@@ -74,13 +73,13 @@ export async function validate(dataFile: string, options: OptionValues) {
               containerResult.locations,
               schemaManager,
               dockerManager,
-              options.out
+              downloadManager
             );
             await assessReferencedProviders(
               providerReferences,
               schemaManager,
               dockerManager,
-              options.out
+              downloadManager
             );
           } else if (
             options.target === 'in-network-rates' &&
@@ -90,7 +89,7 @@ export async function validate(dataFile: string, options: OptionValues) {
               containerResult.locations.providerReference,
               schemaManager,
               dockerManager,
-              options.out
+              downloadManager
             );
           }
         }
@@ -108,7 +107,8 @@ export async function validate(dataFile: string, options: OptionValues) {
 
 export async function validateFromUrl(dataUrl: string, options: OptionValues) {
   temp.track();
-  if (await checkDataUrl(dataUrl)) {
+  const downloadManager = new DownloadManager(options.yesAll);
+  if (await downloadManager.checkDataUrl(dataUrl)) {
     const schemaManager = new SchemaManager();
     await schemaManager.ensureRepo();
     schemaManager.strict = options.strict;
@@ -121,14 +121,13 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
       })
       .then(async schemaPath => {
         if (schemaPath != null) {
-          const dockerManager = new DockerManager();
-          const dataFile = await downloadDataFile(dataUrl, temp.mkdirSync());
+          const dockerManager = new DockerManager(options.out);
+          const dataFile = await downloadManager.downloadDataFile(dataUrl);
           if (typeof dataFile === 'string') {
             const containerResult = await dockerManager.runContainer(
               schemaPath,
               options.target,
-              dataFile,
-              options.out
+              dataFile
             );
             if (containerResult.pass) {
               if (options.target === 'table-of-contents') {
@@ -136,13 +135,13 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                   containerResult.locations,
                   schemaManager,
                   dockerManager,
-                  options.out
+                  downloadManager
                 );
                 await assessReferencedProviders(
                   providerReferences,
                   schemaManager,
                   dockerManager,
-                  options.out
+                  downloadManager
                 );
               } else if (
                 options.target === 'in-network-rates' &&
@@ -152,7 +151,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                   containerResult.locations.providerReference,
                   schemaManager,
                   dockerManager,
-                  options.out
+                  downloadManager
                 );
               }
             }
@@ -163,12 +162,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
             while (continuation === true) {
               const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
               await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
-              await dockerManager.runContainer(
-                schemaPath,
-                options.target,
-                dataFile.dataPath,
-                options.out
-              );
+              await dockerManager.runContainer(schemaPath, options.target, dataFile.dataPath);
               continuation = readlineSync.keyInYNStrict(
                 'Would you like to validate another file in the ZIP?'
               );
