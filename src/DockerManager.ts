@@ -44,9 +44,6 @@ export class DockerManager {
           .promisify(exec)(runCommand)
           .then(() => {
             const containerResult: ContainerResult = { pass: true };
-            if (outputPath && fs.existsSync(containerOutputPath)) {
-              fs.copySync(containerOutputPath, outputPath);
-            }
             if (fs.existsSync(containerOutputPath)) {
               if (outputPath) {
                 fs.copySync(containerOutputPath, outputPath);
@@ -65,9 +62,6 @@ export class DockerManager {
             return containerResult;
           })
           .catch(() => {
-            if (outputPath && fs.existsSync(path.join(outputDir, 'output.txt'))) {
-              fs.copySync(path.join(outputDir, 'output.txt'), outputPath);
-            }
             if (fs.existsSync(containerOutputPath)) {
               if (outputPath) {
                 fs.copySync(containerOutputPath, outputPath);
