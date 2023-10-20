@@ -13,7 +13,7 @@
     "build": "del-cli out && tsc",
     "prettier": "prettier --check \"src/*.ts\"",
     "prepare": "npm run build",
-    "test": "jest --coverage"
+    "test": "node --expose-gc ./node_modules/.bin/jest --runInBand --logHeapUsage"
   },
   "repository": {
     "type": "git",
