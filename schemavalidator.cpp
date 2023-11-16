@@ -161,34 +161,66 @@ static void CreateErrorMessages(const ValueType &errors, FILE *outFile, size_t d
   }
 }
 
+string objectPathToString(list<pair<string, int>> &objectPath)
+{
+  string result = "";
+  if (objectPath.size() == 0)
+  {
+    return result;
+  }
+  else
+  {
+    for (const auto pathPart : objectPath)
+    {
+      if (pathPart.first == "[]")
+      {
+        result.append("[");
+        result.append(to_string(pathPart.second));
+        result.append("]");
+      }
+      else
+      {
+        result.append(".");
+        result.append(pathPart.first);
+      }
+    }
+  }
+  return result;
+}
+
 struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 {
   static list<string> providerReferencePath;
   static list<string> tocInNetworkPath;
   static list<string> tocAllowedAmountPath;
+  static list<string> negotiatedPricePath;
 
   enum State
   {
     traversingObject,
     expectLocationKey,
-    expectLocationValue
+    expectLocationValue,
+    expectInfoKey,
+    expectInfoValue
   } state_;
   list<string> objectPath;
+  list<pair<string, int>> objectPathWithArrayIndices;
   list<string> inNetworkLocations;
   list<string> additionalLocations;
   string lastKey;
   string schemaName;
+  int negotiatedPriceCount;
+  int additionalInfoCount;
 
   MessageHandler(string name)
   {
-    // we should store a bit more context so we know when we're in various location areas
-    // in-network-rates: provider_references[].location
-    // table-of-contents: reporting_structure[].in_network_files[].location, reporting_structure[].allowed_amount_file.location
     inNetworkLocations = {};
     additionalLocations = {};
     objectPath = {};
     state_ = traversingObject;
     schemaName = name;
+    negotiatedPriceCount = 0;
+    additionalInfoCount = 0;
   }
 
   bool Key(const Ch *str, SizeType len, bool copy)
@@ -196,6 +228,10 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     if (strcmp(str, "location") == 0 && state_ == traversingObject)
     {
       state_ = expectLocationKey;
+    }
+    else if (strcmp(str, "additional_information") == 0 && state_ == traversingObject)
+    {
+      state_ = expectInfoKey;
     }
     lastKey = string(str);
     return BaseReaderHandler::Key(str, len, copy);
@@ -206,6 +242,11 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     if (state_ == expectLocationKey && strcmp(str, "location") == 0)
     {
       state_ = expectLocationValue;
+      lastKey = "";
+    }
+    else if (state_ == expectInfoKey && strcmp(str, "additional_information") == 0)
+    {
+      state_ = expectInfoValue;
       lastKey = "";
     }
     else if (state_ == expectLocationValue)
@@ -231,7 +272,18 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 
       state_ = traversingObject;
     }
-
+    else if (state_ == expectInfoValue)
+    {
+      if (schemaName == "in-network-rates" && objectPath == negotiatedPricePath)
+      {
+        // we found additional info... for now, just print it
+        printf("additional info: %s\n", str);
+        additionalInfoCount++;
+        printf(objectPathToString(objectPathWithArrayIndices).c_str());
+        printf("\n");
+      }
+      state_ = traversingObject;
+    }
     return BaseReaderHandler::String(str, len, copy);
   }
 
@@ -240,15 +292,25 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     if (lastKey.size() > 0)
     {
       objectPath.push_back(lastKey);
+      objectPathWithArrayIndices.push_back(make_pair(lastKey, -1));
     }
     return BaseReaderHandler::StartObject();
   }
 
   bool EndObject(SizeType len)
   {
+    if (objectPath == negotiatedPricePath)
+    {
+      negotiatedPriceCount++;
+    }
     if (objectPath.size() > 0 && objectPath.back() != "[]")
     {
       objectPath.pop_back();
+      objectPathWithArrayIndices.pop_back();
+    }
+    else if (objectPath.size() > 0 && objectPath.back() == "[]")
+    {
+      objectPathWithArrayIndices.back().second++;
     }
     lastKey = "";
     return BaseReaderHandler::EndObject(len);
@@ -258,6 +320,8 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   {
     objectPath.push_back(lastKey);
     objectPath.push_back("[]");
+    objectPathWithArrayIndices.push_back(make_pair(lastKey, -1));
+    objectPathWithArrayIndices.push_back(make_pair("[]", 0));
     lastKey = "";
     return BaseReaderHandler::StartArray();
   }
@@ -266,6 +330,9 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   {
     objectPath.pop_back();
     objectPath.pop_back();
+
+    objectPathWithArrayIndices.pop_back();
+    objectPathWithArrayIndices.pop_back();
     lastKey = "";
     return BaseReaderHandler::EndArray(len);
   }
@@ -274,6 +341,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 list<string> MessageHandler::providerReferencePath = {"provider_references", "[]"};
 list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files", "[]"};
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
+list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
 
 int main(int argc, char *argv[])
 {
@@ -282,26 +350,30 @@ int main(int argc, char *argv[])
   string outputPath;
   int bufferSize = 4069;
   string schemaName;
+  bool failFast;
 
   try
   {
     TCLAP::CmdLine cmd("validator for machine-readable files", ' ', "0.1");
     TCLAP::UnlabeledValueArg<string> schemaArg("schema-path", "path to schema file", true, "", "path");
     TCLAP::UnlabeledValueArg<string> dataArg("data-path", "path to data file", true, "", "path");
-    TCLAP::ValueArg<string> outputArg("o", "output-path", "path to output directory", false, "/output", "path");
+    TCLAP::UnlabeledValueArg<string> outputArg("output-path", "path to output directory", false, "/output", "path");
     TCLAP::ValueArg<int> bufferArg("b", "buffer-size", "buffer size in bytes", false, 4069, "integer");
     TCLAP::ValueArg<string> schemaNameArg("s", "schema-name", "schema name", false, "", "string");
+    TCLAP::SwitchArg failFastArg("f", "fail-fast", "if set, stop validating after the first error");
     cmd.add(schemaArg);
     cmd.add(dataArg);
     cmd.add(outputArg);
     cmd.add(bufferArg);
     cmd.add(schemaNameArg);
+    cmd.add(failFastArg);
     cmd.parse(argc, argv);
     schemaPath = schemaArg.getValue();
     dataPath = dataArg.getValue();
     outputPath = outputArg.getValue();
     bufferSize = bufferArg.getValue();
     schemaName = schemaNameArg.getValue();
+    failFast = failFastArg.getValue();
   }
   catch (TCLAP::ArgException &e)
   {
@@ -313,14 +385,24 @@ int main(int argc, char *argv[])
   FILE *outFile;
   FILE *locationFile;
   FILE *errFile;
+  FILE *errJsonFile;
   bool fileOutput = false;
   bool locationOutput = false;
-  if (outputPath.length() > 0 && filesystem::is_directory(outputPath))
+  if (outputPath.length() > 0)
   {
+    if (!filesystem::exists(outputPath))
+    {
+      filesystem::create_directories(outputPath);
+    }
+    else if (!filesystem::is_directory(outputPath))
+    {
+      printf("Could not use directory '%s' for output: path already exists and is not a directory\n", outputPath.c_str());
+      return -1;
+    }
     outFile = fopen((filesystem::path(outputPath) / "output.txt").c_str(), "w");
     if (!outFile)
     {
-      printf("Could not use directory '%s' for output\n", outputPath.c_str());
+      printf("Could not open output file in '%s' for output\n", outputPath.c_str());
       return -1;
     }
     locationFile = fopen((filesystem::path(outputPath) / "locations.json").c_str(), "w");
@@ -333,6 +415,12 @@ int main(int argc, char *argv[])
     {
       locationOutput = true;
     }
+    errJsonFile = fopen((filesystem::path(outputPath) / "errors.json").c_str(), "w");
+    if (!errJsonFile)
+    {
+      printf("Could not create error json file. JSON errors will be written to main output file.");
+      errJsonFile = outFile;
+    }
     errFile = outFile;
     fileOutput = true;
   }
@@ -341,6 +429,7 @@ int main(int argc, char *argv[])
     outFile = stdout;
     locationFile = stdout;
     errFile = stderr;
+    errJsonFile = stderr;
   }
 
   // Read a JSON schema from file into Document
@@ -380,9 +469,14 @@ int main(int argc, char *argv[])
   SchemaDocument sd(d);
 
   // Use reader to parse the JSON in stdin, and forward SAX events to validator
-  // SchemaValidator validator(sd);
   MessageHandler handler(schemaName);
   GenericSchemaValidator<SchemaDocument, MessageHandler> validator(sd, handler);
+  // set validator flags
+  if (!failFast)
+  {
+    validator.SetValidateFlags(kValidateContinueOnErrorFlag);
+  }
+
   Reader reader;
   FILE *fp2 = fopen(dataPath.c_str(), "r");
   if (!fp2)
@@ -405,51 +499,56 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  // write location info
+  char lb[1024];
+  FileWriteStream locationStream(locationFile, lb, 1024);
+  PrettyWriter<FileWriteStream> locationWriter(locationStream);
+  locationWriter.StartObject();
+  if (handler.inNetworkLocations.size() > 0)
+  {
+    locationWriter.Key("inNetwork");
+    locationWriter.StartArray();
+    for (string loc : handler.inNetworkLocations)
+    {
+      locationWriter.String(loc);
+    }
+    locationWriter.EndArray();
+  }
+  if (handler.additionalLocations.size() > 0)
+  {
+    if (schemaName == "in-network-rates")
+    {
+      locationWriter.Key("providerReference");
+    }
+    else
+    {
+      locationWriter.Key("allowedAmount");
+    }
+    locationWriter.StartArray();
+    for (string loc : handler.additionalLocations)
+    {
+      locationWriter.String(loc);
+    }
+    locationWriter.EndArray();
+  }
+  locationWriter.EndObject();
+  locationWriter.Flush();
+  if (locationOutput)
+  {
+    fclose(locationFile);
+  }
+  if (schemaName == "in-network-rates")
+  {
+    printf("found %d negotiated prices, %d additional info elements\n", handler.negotiatedPriceCount, handler.additionalInfoCount);
+  }
   // Check the validation result
   if (validator.IsValid())
   {
     fprintf(outFile, "Input JSON is valid.\n");
-    char lb[1024];
-    FileWriteStream locationStream(locationFile, lb, 1024);
-    PrettyWriter<FileWriteStream> locationWriter(locationStream);
-    locationWriter.StartObject();
-    if (handler.inNetworkLocations.size() > 0)
-    {
-      locationWriter.Key("inNetwork");
-      locationWriter.StartArray();
-      for (string loc : handler.inNetworkLocations)
-      {
-        locationWriter.String(loc);
-      }
-      locationWriter.EndArray();
-    }
-    if (handler.additionalLocations.size() > 0)
-    {
-      if (schemaName == "in-network-rates")
-      {
-        locationWriter.Key("providerReference");
-      }
-      else
-      {
-        locationWriter.Key("allowedAmount");
-      }
-      locationWriter.StartArray();
-      for (string loc : handler.additionalLocations)
-      {
-        locationWriter.String(loc);
-      }
-      locationWriter.EndArray();
-    }
-    locationWriter.EndObject();
-    locationWriter.Flush();
 
     if (fileOutput)
     {
       fclose(outFile);
-    }
-    if (locationOutput)
-    {
-      fclose(locationFile);
     }
     return EXIT_SUCCESS;
   }
@@ -469,15 +568,11 @@ int main(int argc, char *argv[])
     sb.Clear();
     PrettyWriter<StringBuffer> w(sb);
     validator.GetError().Accept(w);
-    fprintf(errFile, "Error report:\n%s\n", sb.GetString());
+    fprintf(errJsonFile, sb.GetString());
     CreateErrorMessages(validator.GetError(), outFile);
     if (fileOutput)
     {
       fclose(outFile);
-    }
-    if (locationOutput)
-    {
-      fclose(locationFile);
     }
     return EXIT_FAILURE;
   }
