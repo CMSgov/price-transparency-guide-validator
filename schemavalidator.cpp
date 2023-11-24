@@ -161,6 +161,23 @@ static void CreateErrorMessages(const ValueType &errors, FILE *outFile, size_t d
   }
 }
 
+string objectPathToString(list<string> &objectPath)
+{
+  string result = "";
+  if (objectPath.size() > 0)
+  {
+    for (const auto pathPart : objectPath)
+    {
+      if (pathPart != "[]")
+      {
+        result.append(".");
+      }
+      result.append(pathPart);
+    }
+  }
+  return result;
+}
+
 string objectPathToString(list<pair<string, int>> &objectPath)
 {
   string result = "";
@@ -188,12 +205,20 @@ string objectPathToString(list<pair<string, int>> &objectPath)
   return result;
 }
 
+struct ItemCounter
+{
+  string schemaName;
+  list<string> path;
+  int count;
+};
+
 struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 {
   static list<string> providerReferencePath;
   static list<string> tocInNetworkPath;
   static list<string> tocAllowedAmountPath;
   static list<string> negotiatedPricePath;
+  static list<string> additionalInfoPath;
 
   enum State
   {
@@ -201,16 +226,18 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     expectLocationKey,
     expectLocationValue,
     expectInfoKey,
-    expectInfoValue
+    expectInfoValue,
+    expectGenericKey,
+    expectGenericValue
   } state_;
   list<string> objectPath;
   list<pair<string, int>> objectPathWithArrayIndices;
   list<string> inNetworkLocations;
   list<string> additionalLocations;
+  list<ItemCounter> pathsForCounting;
+  list<ItemCounter> pathsForReporting;
   string lastKey;
   string schemaName;
-  int negotiatedPriceCount;
-  int additionalInfoCount;
 
   MessageHandler(string name)
   {
@@ -219,8 +246,8 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     objectPath = {};
     state_ = traversingObject;
     schemaName = name;
-    negotiatedPriceCount = 0;
-    additionalInfoCount = 0;
+    pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
+                        {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
   }
 
   bool Key(const Ch *str, SizeType len, bool copy)
@@ -229,17 +256,46 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     {
       state_ = expectLocationKey;
     }
-    else if (strcmp(str, "additional_information") == 0 && state_ == traversingObject)
-    {
-      state_ = expectInfoKey;
-    }
+    // else if (strcmp(str, "additional_information") == 0 && state_ == traversingObject)
+    // {
+    //   state_ = expectInfoKey;
+    // }
     lastKey = string(str);
+    // start bonus stuff
+    // check all counted things
+    // when processing a key, we can check paths that end with a key name
+    for (auto &zagwo : pathsForCounting)
+    {
+      if (schemaName == zagwo.schemaName && zagwo.path.back() != "[]" && almostThere(zagwo.path))
+      {
+        printf("found an item by key! %s\n", objectPathToString(zagwo.path).c_str());
+        ++(zagwo.count);
+      }
+    }
+    if (schemaName == "in-network-rates" && almostThere(additionalInfoPath))
+    {
+      printf("bonus! next non-key string is additional info!\n");
+      state_ = expectGenericKey;
+    }
+    // end bonus stuff
     return BaseReaderHandler::Key(str, len, copy);
   }
 
   bool String(const Ch *str, SizeType len, bool copy)
   {
-    if (state_ == expectLocationKey && strcmp(str, "location") == 0)
+    string currentString = string(str);
+    if (state_ == expectGenericKey && lastKey == currentString)
+    {
+      state_ = expectGenericValue;
+    }
+    else if (state_ == expectGenericValue)
+    {
+      printf("getting generic value for key: %s\n%s\n", lastKey.c_str(), str);
+      printf(objectPathToString(objectPathWithArrayIndices).c_str());
+      printf("\n");
+      state_ = traversingObject;
+    }
+    else if (state_ == expectLocationKey && strcmp(str, "location") == 0)
     {
       state_ = expectLocationValue;
       lastKey = "";
@@ -278,7 +334,6 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
       {
         // we found additional info... for now, just print it
         printf("additional info: %s\n", str);
-        additionalInfoCount++;
         printf(objectPathToString(objectPathWithArrayIndices).c_str());
         printf("\n");
       }
@@ -294,15 +349,26 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
       objectPath.push_back(lastKey);
       objectPathWithArrayIndices.push_back(make_pair(lastKey, -1));
     }
+    else
+    {
+      // lastKey is empty, which means that this object is an element of an array.
+      // so, check paths that end with "[]", because they want to count up array elements.
+      for (auto &zagwo : pathsForCounting)
+      {
+        if (schemaName == zagwo.schemaName && zagwo.path.back() == "[]" && zagwo.path == objectPath)
+        {
+          printf("found an item in an array! %s\n", objectPathToString(zagwo.path).c_str());
+          ++(zagwo.count);
+        }
+      }
+    }
     return BaseReaderHandler::StartObject();
   }
 
   bool EndObject(SizeType len)
   {
-    if (objectPath == negotiatedPricePath)
-    {
-      negotiatedPriceCount++;
-    }
+    // here is the place where we can count up how many of an object appears
+    // or maybe we do that at start object? or at key?
     if (objectPath.size() > 0 && objectPath.back() != "[]")
     {
       objectPath.pop_back();
@@ -336,12 +402,37 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     return BaseReaderHandler::EndArray(len);
   }
+
+  bool almostThere(list<string> &targetPath)
+  {
+    // true if objectPath + [lastKey] == targetPath
+    int objectLength = objectPath.size();
+    int targetLength = targetPath.size();
+    if (objectLength + 1 == targetLength)
+    {
+      std::list<string>::iterator targIt = targetPath.begin();
+      for (std::list<string>::iterator objIt = objectPath.begin(); objIt != objectPath.end(); ++objIt)
+      {
+        if (*targIt != *objIt)
+        {
+          return false;
+        }
+        ++targIt;
+      }
+      return lastKey == targetPath.back();
+    }
+    else
+    {
+      return false;
+    }
+  }
 };
 
 list<string> MessageHandler::providerReferencePath = {"provider_references", "[]"};
 list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files", "[]"};
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
 list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
+list<string> MessageHandler::additionalInfoPath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "additional_information"};
 
 int main(int argc, char *argv[])
 {
@@ -537,9 +628,10 @@ int main(int argc, char *argv[])
   {
     fclose(locationFile);
   }
-  if (schemaName == "in-network-rates")
+  printf("we counted some items.\n");
+  for (auto magicPath : handler.pathsForCounting)
   {
-    printf("found %d negotiated prices, %d additional info elements\n", handler.negotiatedPriceCount, handler.additionalInfoCount);
+    printf("schema: %s --- path: %s --- count: %d\n", magicPath.schemaName.c_str(), objectPathToString(magicPath.path).c_str(), magicPath.count);
   }
   // Check the validation result
   if (validator.IsValid())
