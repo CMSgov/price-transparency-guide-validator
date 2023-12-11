@@ -212,6 +212,14 @@ struct ItemCounter
   int count;
 };
 
+struct ItemReporter
+{
+  string schemaName;
+  list<string> path;
+  list<string> values;
+  list<string> locations;
+};
+
 struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 {
   static list<string> providerReferencePath;
@@ -223,10 +231,6 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   enum State
   {
     traversingObject,
-    expectLocationKey,
-    expectLocationValue,
-    expectInfoKey,
-    expectInfoValue,
     expectGenericKey,
     expectGenericValue
   } state_;
@@ -235,7 +239,8 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   list<string> inNetworkLocations;
   list<string> additionalLocations;
   list<ItemCounter> pathsForCounting;
-  list<ItemCounter> pathsForReporting;
+  list<ItemReporter> pathsForReporting;
+  ItemReporter *currentReport;
   string lastKey;
   string schemaName;
 
@@ -248,34 +253,33 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     schemaName = name;
     pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
                         {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
+    pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath, .values = {}, .locations = {}},
+                         {.schemaName = "table-of-contents", .path = tocAllowedAmountPath, .values = {}, .locations = {}},
+                         {.schemaName = "table-of-contents", .path = tocInNetworkPath, .values = {}, .locations = {}}};
   }
 
   bool Key(const Ch *str, SizeType len, bool copy)
   {
-    if (strcmp(str, "location") == 0 && state_ == traversingObject)
-    {
-      state_ = expectLocationKey;
-    }
-    // else if (strcmp(str, "additional_information") == 0 && state_ == traversingObject)
-    // {
-    //   state_ = expectInfoKey;
-    // }
     lastKey = string(str);
     // start bonus stuff
     // check all counted things
     // when processing a key, we can check paths that end with a key name
-    for (auto &zagwo : pathsForCounting)
+    for (auto &ic : pathsForCounting)
     {
-      if (schemaName == zagwo.schemaName && zagwo.path.back() != "[]" && almostThere(zagwo.path))
+      if (schemaName == ic.schemaName && ic.path.back() != "[]" && almostThere(ic.path))
       {
-        printf("found an item by key! %s\n", objectPathToString(zagwo.path).c_str());
-        ++(zagwo.count);
+        printf("found a count item by key! %s\n", objectPathToString(ic.path).c_str());
+        ++(ic.count);
       }
     }
-    if (schemaName == "in-network-rates" && almostThere(additionalInfoPath))
+    for (auto &ir : pathsForReporting)
     {
-      printf("bonus! next non-key string is additional info!\n");
-      state_ = expectGenericKey;
+      if (schemaName == ir.schemaName && ir.path.back() != "[]" && almostThere(ir.path))
+      {
+        printf("found a report item by key! %s\n", objectPathToString(ir.path).c_str());
+        state_ = expectGenericKey;
+        currentReport = (&ir);
+      }
     }
     // end bonus stuff
     return BaseReaderHandler::Key(str, len, copy);
@@ -290,53 +294,8 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     }
     else if (state_ == expectGenericValue)
     {
-      printf("getting generic value for key: %s\n%s\n", lastKey.c_str(), str);
-      printf(objectPathToString(objectPathWithArrayIndices).c_str());
-      printf("\n");
-      state_ = traversingObject;
-    }
-    else if (state_ == expectLocationKey && strcmp(str, "location") == 0)
-    {
-      state_ = expectLocationValue;
-      lastKey = "";
-    }
-    else if (state_ == expectInfoKey && strcmp(str, "additional_information") == 0)
-    {
-      state_ = expectInfoValue;
-      lastKey = "";
-    }
-    else if (state_ == expectLocationValue)
-    {
-      // check the object path to see what list we want to add to
-      // if it's the in network locations, use that list
-      // otherwise use additionalLocations
-      if (schemaName == "table-of-contents")
-      {
-        if (objectPath == tocInNetworkPath)
-        {
-          inNetworkLocations.push_back(string(str));
-        }
-        else if (objectPath == tocAllowedAmountPath)
-        {
-          additionalLocations.push_back(string(str));
-        }
-      }
-      else if (schemaName == "in-network-rates" && objectPath == providerReferencePath)
-      {
-        additionalLocations.push_back(string(str));
-      }
-
-      state_ = traversingObject;
-    }
-    else if (state_ == expectInfoValue)
-    {
-      if (schemaName == "in-network-rates" && objectPath == negotiatedPricePath)
-      {
-        // we found additional info... for now, just print it
-        printf("additional info: %s\n", str);
-        printf(objectPathToString(objectPathWithArrayIndices).c_str());
-        printf("\n");
-      }
+      currentReport->values.push_back(str);
+      currentReport->locations.push_back(objectPathToString(objectPathWithArrayIndices));
       state_ = traversingObject;
     }
     return BaseReaderHandler::String(str, len, copy);
@@ -428,7 +387,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   }
 };
 
-list<string> MessageHandler::providerReferencePath = {"provider_references", "[]"};
+list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
 list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files", "[]"};
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
 list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
@@ -474,11 +433,11 @@ int main(int argc, char *argv[])
 
   // if an output file is specified, try to open it for writing
   FILE *outFile;
-  FILE *locationFile;
+  FILE *reportFile;
   FILE *errFile;
   FILE *errJsonFile;
   bool fileOutput = false;
-  bool locationOutput = false;
+  bool reportOutput = false;
   if (outputPath.length() > 0)
   {
     if (!filesystem::exists(outputPath))
@@ -496,15 +455,15 @@ int main(int argc, char *argv[])
       printf("Could not open output file in '%s' for output\n", outputPath.c_str());
       return -1;
     }
-    locationFile = fopen((filesystem::path(outputPath) / "locations.json").c_str(), "w");
-    if (!locationFile)
+    reportFile = fopen((filesystem::path(outputPath) / "reports.json").c_str(), "w");
+    if (!reportFile)
     {
-      printf("Could not create location output file. Location information will not be saved to file.");
-      locationFile = stdout;
+      printf("Could not create report output file. Reported information will not be saved to file.");
+      reportFile = stdout;
     }
     else
     {
-      locationOutput = true;
+      reportOutput = true;
     }
     errJsonFile = fopen((filesystem::path(outputPath) / "errors.json").c_str(), "w");
     if (!errJsonFile)
@@ -518,7 +477,7 @@ int main(int argc, char *argv[])
   else
   {
     outFile = stdout;
-    locationFile = stdout;
+    reportFile = stdout;
     errFile = stderr;
     errJsonFile = stderr;
   }
@@ -592,46 +551,58 @@ int main(int argc, char *argv[])
 
   // write location info
   char lb[1024];
-  FileWriteStream locationStream(locationFile, lb, 1024);
-  PrettyWriter<FileWriteStream> locationWriter(locationStream);
-  locationWriter.StartObject();
-  if (handler.inNetworkLocations.size() > 0)
-  {
-    locationWriter.Key("inNetwork");
-    locationWriter.StartArray();
-    for (string loc : handler.inNetworkLocations)
-    {
-      locationWriter.String(loc);
-    }
-    locationWriter.EndArray();
-  }
-  if (handler.additionalLocations.size() > 0)
-  {
-    if (schemaName == "in-network-rates")
-    {
-      locationWriter.Key("providerReference");
-    }
-    else
-    {
-      locationWriter.Key("allowedAmount");
-    }
-    locationWriter.StartArray();
-    for (string loc : handler.additionalLocations)
-    {
-      locationWriter.String(loc);
-    }
-    locationWriter.EndArray();
-  }
-  locationWriter.EndObject();
-  locationWriter.Flush();
-  if (locationOutput)
-  {
-    fclose(locationFile);
-  }
-  printf("we counted some items.\n");
+  FileWriteStream reportStream(reportFile, lb, 1024);
+  PrettyWriter<FileWriteStream> reportWriter(reportStream);
+  reportWriter.SetIndent(' ', 2);
+  reportWriter.StartObject();
+  reportWriter.Key("counts");
+  reportWriter.StartArray();
+
   for (auto magicPath : handler.pathsForCounting)
   {
-    printf("schema: %s --- path: %s --- count: %d\n", magicPath.schemaName.c_str(), objectPathToString(magicPath.path).c_str(), magicPath.count);
+    if (magicPath.schemaName == schemaName)
+    {
+      reportWriter.StartObject();
+      reportWriter.Key("path");
+      reportWriter.String(objectPathToString(magicPath.path));
+      reportWriter.Key("count");
+      reportWriter.Int(magicPath.count);
+      reportWriter.EndObject();
+    }
+  }
+  reportWriter.EndArray();
+  reportWriter.Key("reports");
+  reportWriter.StartArray();
+  for (auto magicPath : handler.pathsForReporting)
+  {
+    if (magicPath.schemaName == schemaName)
+    {
+      reportWriter.StartObject();
+      reportWriter.Key("path");
+      reportWriter.String(objectPathToString(magicPath.path));
+      reportWriter.Key("items");
+      reportWriter.StartArray();
+      std::list<string>::iterator locationIt = magicPath.locations.begin();
+      for (std::list<string>::iterator valueIt = magicPath.values.begin(); valueIt != magicPath.values.end(); ++valueIt)
+      {
+        reportWriter.StartObject();
+        reportWriter.Key("location");
+        reportWriter.String(*locationIt);
+        reportWriter.Key("value");
+        reportWriter.String(*valueIt);
+        reportWriter.EndObject();
+        ++locationIt;
+      }
+      reportWriter.EndArray();
+      reportWriter.EndObject();
+    }
+  }
+  reportWriter.EndArray();
+  reportWriter.EndObject();
+  reportWriter.Flush();
+  if (reportOutput)
+  {
+    fclose(reportFile);
   }
   // Check the validation result
   if (validator.IsValid())
