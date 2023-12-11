@@ -1,6 +1,6 @@
 # Price Transparency Machine-readable File Validator
 
-This tool is used to validate machine-readable files in JSON format against the [schemas published by CMS](https://github.com/CMSgov/price-transparency-guide).
+This tool is used to validate [Transparency in Coverage](https://www.cms.gov/priorities/key-initiatives/healthplan-price-transparency) machine-readable files in JSON format against the [schemas published by CMS](https://github.com/CMSgov/price-transparency-guide).
 
 ## Installation
 
