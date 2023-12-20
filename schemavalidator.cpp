@@ -178,7 +178,7 @@ string objectPathToString(list<string> &objectPath)
   return result;
 }
 
-string objectPathToString(list<pair<string, int>> &objectPath)
+string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
 {
   string result = "";
   if (objectPath.size() == 0)
@@ -201,6 +201,11 @@ string objectPathToString(list<pair<string, int>> &objectPath)
         result.append(pathPart.first);
       }
     }
+  }
+  if (lastPart != "")
+  {
+    result.append(".");
+    result.append(lastPart);
   }
   return result;
 }
@@ -227,6 +232,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   static list<string> tocAllowedAmountPath;
   static list<string> negotiatedPricePath;
   static list<string> additionalInfoPath;
+  static list<string> inNetworkProviderGroupsPath;
 
   enum State
   {
@@ -254,6 +260,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
                         {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
     pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath, .values = {}, .locations = {}},
+                         {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath, .values = {}, .locations = {}},
                          {.schemaName = "table-of-contents", .path = tocAllowedAmountPath, .values = {}, .locations = {}},
                          {.schemaName = "table-of-contents", .path = tocInNetworkPath, .values = {}, .locations = {}}};
   }
@@ -261,28 +268,45 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   bool Key(const Ch *str, SizeType len, bool copy)
   {
     lastKey = string(str);
-    // start bonus stuff
     // check all counted things
     // when processing a key, we can check paths that end with a key name
     for (auto &ic : pathsForCounting)
     {
       if (schemaName == ic.schemaName && ic.path.back() != "[]" && almostThere(ic.path))
       {
-        printf("found a count item by key! %s\n", objectPathToString(ic.path).c_str());
+        printf("found a count item by key! %s\n", objectPathToString(objectPath).c_str());
         ++(ic.count);
       }
     }
+    state_ = traversingObject;
     for (auto &ir : pathsForReporting)
     {
       if (schemaName == ir.schemaName && ir.path.back() != "[]" && almostThere(ir.path))
       {
-        printf("found a report item by key! %s\n", objectPathToString(ir.path).c_str());
+        printf("found a report item by key! %s\n", objectPathToString(objectPath).c_str());
         state_ = expectGenericKey;
         currentReport = (&ir);
       }
     }
-    // end bonus stuff
     return BaseReaderHandler::Key(str, len, copy);
+  }
+
+  // this function isn't getting called?
+  // tricky is afoot, to be certain
+  bool RawNumber(const Ch *str, SizeType len, bool copy)
+  {
+    string currentString = string(str);
+    if (state_ == expectGenericValue)
+    {
+      currentReport->values.push_back(str);
+      currentReport->locations.push_back(objectPathToString(objectPathWithArrayIndices, lastKey));
+      // state_ = traversingObject;
+      if (objectPath.size() > 0 && objectPath.back() == "[]")
+      {
+        objectPathWithArrayIndices.back().second++;
+      }
+    }
+    return BaseReaderHandler::RawNumber(str, len, copy);
   }
 
   bool String(const Ch *str, SizeType len, bool copy)
@@ -295,9 +319,13 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     else if (state_ == expectGenericValue)
     {
       currentReport->values.push_back(str);
-      currentReport->locations.push_back(objectPathToString(objectPathWithArrayIndices));
-      state_ = traversingObject;
+      currentReport->locations.push_back(objectPathToString(objectPathWithArrayIndices, lastKey));
+      if (objectPath.size() > 0 && objectPath.back() == "[]")
+      {
+        objectPathWithArrayIndices.back().second++;
+      }
     }
+
     return BaseReaderHandler::String(str, len, copy);
   }
 
@@ -312,12 +340,12 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     {
       // lastKey is empty, which means that this object is an element of an array.
       // so, check paths that end with "[]", because they want to count up array elements.
-      for (auto &zagwo : pathsForCounting)
+      for (auto &countPath : pathsForCounting)
       {
-        if (schemaName == zagwo.schemaName && zagwo.path.back() == "[]" && zagwo.path == objectPath)
+        if (schemaName == countPath.schemaName && countPath.path.back() == "[]" && countPath.path == objectPath)
         {
-          printf("found an item in an array! %s\n", objectPathToString(zagwo.path).c_str());
-          ++(zagwo.count);
+          printf("found an item in an array! %s\n", objectPathToString(countPath.path).c_str());
+          ++(countPath.count);
         }
       }
     }
@@ -364,13 +392,17 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 
   bool almostThere(list<string> &targetPath)
   {
+    if (targetPath.back() == "*")
+    {
+      return alongTheWildcard(targetPath);
+    }
     // true if objectPath + [lastKey] == targetPath
     int objectLength = objectPath.size();
     int targetLength = targetPath.size();
     if (objectLength + 1 == targetLength)
     {
-      std::list<string>::iterator targIt = targetPath.begin();
-      for (std::list<string>::iterator objIt = objectPath.begin(); objIt != objectPath.end(); ++objIt)
+      list<string>::iterator targIt = targetPath.begin();
+      for (list<string>::iterator objIt = objectPath.begin(); objIt != objectPath.end(); ++objIt)
       {
         if (*targIt != *objIt)
         {
@@ -385,6 +417,34 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
       return false;
     }
   }
+
+  bool alongTheWildcard(list<string> &targetPath)
+  {
+    // true if objectPath + [lastKey] matches targetPath until the * on targetPath is reached
+    int objectLength = objectPath.size();
+    int targetLength = targetPath.size();
+    if (objectLength + 1 >= targetLength)
+    {
+      list<string>::iterator targIt = targetPath.begin();
+      for (list<string>::iterator objIt = objectPath.begin(); objIt != objectPath.end(); ++objIt)
+      {
+        if (*targIt == "*")
+        {
+          return true;
+        }
+        else if (*targIt != *objIt)
+        {
+          return false;
+        }
+        ++targIt;
+      }
+      return *targIt == "*";
+    }
+    else
+    {
+      return false;
+    }
+  }
 };
 
 list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
@@ -392,6 +452,7 @@ list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "i
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
 list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
 list<string> MessageHandler::additionalInfoPath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "additional_information"};
+list<string> MessageHandler::inNetworkProviderGroupsPath = {"in_network", "[]", "negotiated_rates", "[]", "provider_groups", "[]", "*"};
 
 int main(int argc, char *argv[])
 {
@@ -539,7 +600,7 @@ int main(int argc, char *argv[])
     return -1;
   }
   FileReadStream is(fp2, buffer, sizeof(buffer));
-  if (!reader.Parse(is, validator) && reader.GetParseErrorCode() != kParseErrorTermination)
+  if (!reader.Parse<kParseNumbersAsStringsFlag, FileReadStream, GenericSchemaValidator<SchemaDocument, MessageHandler>>(is, validator) && reader.GetParseErrorCode() != kParseErrorTermination)
   {
     // Schema validator error would cause kParseErrorTermination, which will handle it in next step.
     fprintf(errFile, "Input is not a valid JSON\n");
