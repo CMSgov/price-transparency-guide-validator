@@ -249,20 +249,42 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   ItemReporter *currentReport;
   string lastKey;
   string schemaName;
+  PrettyWriter<FileWriteStream> *reportWriter;
 
-  MessageHandler(string name)
+  MessageHandler(string name, PrettyWriter<FileWriteStream> &reportFile)
   {
     inNetworkLocations = {};
     additionalLocations = {};
     objectPath = {};
     state_ = traversingObject;
     schemaName = name;
-    pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
-                        {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
+    // pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
+    //                     {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
+    pathsForCounting = {};
     pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath, .values = {}, .locations = {}},
                          {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath, .values = {}, .locations = {}},
                          {.schemaName = "table-of-contents", .path = tocAllowedAmountPath, .values = {}, .locations = {}},
                          {.schemaName = "table-of-contents", .path = tocInNetworkPath, .values = {}, .locations = {}}};
+    reportWriter = &reportFile;
+    reportWriter->StartObject();
+    currentReport = NULL;
+  }
+
+  ~MessageHandler()
+  {
+    if (reportWriter != NULL)
+    {
+      reportWriter->Flush();
+    }
+  }
+
+  void CleanupWriter()
+  {
+    if (reportWriter != NULL)
+    {
+      reportWriter->EndObject();
+      reportWriter->Flush();
+    }
   }
 
   bool Key(const Ch *str, SizeType len, bool copy)
@@ -270,59 +292,61 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = string(str);
     // check all counted things
     // when processing a key, we can check paths that end with a key name
-    for (auto &ic : pathsForCounting)
+    // for (auto &ic : pathsForCounting)
+    // {
+    //   if (schemaName == ic.schemaName && ic.path.back() != "[]" && almostThere(ic.path))
+    //   {
+    //     printf("found a count item by key! %s\n", objectPathToString(objectPath).c_str());
+    //     ++(ic.count);
+    //   }
+    // }
+    // when we get to a key that matches a path up until the end,
+    // we want to stream a report until the path no longer matches.
+    // if currentReport is not null, check if it's still valid.
+    // if so, write that key and let it ride.
+    // otherwise, set it to null
+    if (currentReport != NULL)
     {
-      if (schemaName == ic.schemaName && ic.path.back() != "[]" && almostThere(ic.path))
+      if (almostThere(currentReport->path))
       {
-        printf("found a count item by key! %s\n", objectPathToString(objectPath).c_str());
-        ++(ic.count);
+        reportWriter->Key(lastKey);
+      }
+      else
+      {
+        currentReport = NULL;
       }
     }
-    state_ = traversingObject;
-    for (auto &ir : pathsForReporting)
+    // if currentReport is null, check if it matches any paths.
+    // if so, set currentReport to that report, and start up that report at the current path.
+    if (currentReport == NULL)
     {
-      if (schemaName == ir.schemaName && ir.path.back() != "[]" && almostThere(ir.path))
+      for (auto &ir : pathsForReporting)
       {
-        printf("found a report item by key! %s\n", objectPathToString(objectPath).c_str());
-        state_ = expectGenericKey;
-        currentReport = (&ir);
+        if (schemaName == ir.schemaName && ir.path.back() != "[]" && almostThere(ir.path))
+        {
+          reportWriter->Key(objectPathToString(objectPathWithArrayIndices, lastKey));
+          currentReport = (&ir);
+          break;
+        }
       }
     }
-    return BaseReaderHandler::Key(str, len, copy);
-  }
-
-  // this function isn't getting called?
-  // tricky is afoot, to be certain
-  bool RawNumber(const Ch *str, SizeType len, bool copy)
-  {
-    string currentString = string(str);
-    if (state_ == expectGenericValue)
-    {
-      currentReport->values.push_back(str);
-      currentReport->locations.push_back(objectPathToString(objectPathWithArrayIndices, lastKey));
-      // state_ = traversingObject;
-      if (objectPath.size() > 0 && objectPath.back() == "[]")
-      {
-        objectPathWithArrayIndices.back().second++;
-      }
-    }
-    return BaseReaderHandler::RawNumber(str, len, copy);
+    return true;
   }
 
   bool String(const Ch *str, SizeType len, bool copy)
   {
-    string currentString = string(str);
-    if (state_ == expectGenericKey && lastKey == currentString)
+    lastKey = "";
+    if (objectPath.size() > 0 && objectPath.back() == "[]")
     {
-      state_ = expectGenericValue;
+      objectPathWithArrayIndices.back().second++;
     }
-    else if (state_ == expectGenericValue)
+    if (currentReport != NULL)
     {
-      currentReport->values.push_back(str);
-      currentReport->locations.push_back(objectPathToString(objectPathWithArrayIndices, lastKey));
-      if (objectPath.size() > 0 && objectPath.back() == "[]")
+      reportWriter->String(str);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
       {
-        objectPathWithArrayIndices.back().second++;
+        currentReport = NULL;
       }
     }
 
@@ -349,6 +373,10 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
         }
       }
     }
+    if (currentReport != NULL)
+    {
+      reportWriter->StartObject();
+    }
     return BaseReaderHandler::StartObject();
   }
 
@@ -366,6 +394,14 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
       objectPathWithArrayIndices.back().second++;
     }
     lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->EndObject();
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
     return BaseReaderHandler::EndObject(len);
   }
 
@@ -376,6 +412,10 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     objectPathWithArrayIndices.push_back(make_pair(lastKey, -1));
     objectPathWithArrayIndices.push_back(make_pair("[]", 0));
     lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->StartArray();
+    }
     return BaseReaderHandler::StartArray();
   }
 
@@ -383,44 +423,24 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   {
     objectPath.pop_back();
     objectPath.pop_back();
-
     objectPathWithArrayIndices.pop_back();
     objectPathWithArrayIndices.pop_back();
+    // we may have fallen off the current report path
     lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->EndArray();
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
     return BaseReaderHandler::EndArray(len);
   }
 
   bool almostThere(list<string> &targetPath)
   {
-    if (targetPath.back() == "*")
-    {
-      return alongTheWildcard(targetPath);
-    }
-    // true if objectPath + [lastKey] == targetPath
-    int objectLength = objectPath.size();
-    int targetLength = targetPath.size();
-    if (objectLength + 1 == targetLength)
-    {
-      list<string>::iterator targIt = targetPath.begin();
-      for (list<string>::iterator objIt = objectPath.begin(); objIt != objectPath.end(); ++objIt)
-      {
-        if (*targIt != *objIt)
-        {
-          return false;
-        }
-        ++targIt;
-      }
-      return lastKey == targetPath.back();
-    }
-    else
-    {
-      return false;
-    }
-  }
-
-  bool alongTheWildcard(list<string> &targetPath)
-  {
-    // true if objectPath + [lastKey] matches targetPath until the * on targetPath is reached
+    // true if objectPath + [lastKey] matches targetPath until the end of targetPath is reached
     int objectLength = objectPath.size();
     int targetLength = targetPath.size();
     if (objectLength + 1 >= targetLength)
@@ -428,7 +448,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
       list<string>::iterator targIt = targetPath.begin();
       for (list<string>::iterator objIt = objectPath.begin(); objIt != objectPath.end(); ++objIt)
       {
-        if (*targIt == "*")
+        if (targIt == targetPath.end())
         {
           return true;
         }
@@ -438,7 +458,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
         }
         ++targIt;
       }
-      return *targIt == "*";
+      return targIt == targetPath.end() || lastKey == *targIt;
     }
     else
     {
@@ -447,12 +467,12 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   }
 };
 
-list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
-list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files", "[]"};
+// list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
+list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files"};
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
-list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
+// list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
 list<string> MessageHandler::additionalInfoPath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "additional_information"};
-list<string> MessageHandler::inNetworkProviderGroupsPath = {"in_network", "[]", "negotiated_rates", "[]", "provider_groups", "[]", "*"};
+list<string> MessageHandler::inNetworkProviderGroupsPath = {"in_network", "[]", "negotiated_rates", "[]", "provider_groups"};
 
 int main(int argc, char *argv[])
 {
@@ -580,7 +600,11 @@ int main(int argc, char *argv[])
   SchemaDocument sd(d);
 
   // Use reader to parse the JSON in stdin, and forward SAX events to validator
-  MessageHandler handler(schemaName);
+  char lb[1024];
+  FileWriteStream reportStream(reportFile, lb, 1024);
+  PrettyWriter<FileWriteStream> reportWriter(reportStream);
+  reportWriter.SetIndent(' ', 2);
+  MessageHandler handler(schemaName, reportWriter);
   GenericSchemaValidator<SchemaDocument, MessageHandler> validator(sd, handler);
   // set validator flags
   if (!failFast)
@@ -607,60 +631,10 @@ int main(int argc, char *argv[])
     fprintf(errFile, "Error(offset %u): %s\n",
             static_cast<unsigned>(reader.GetErrorOffset()),
             GetParseError_En(reader.GetParseErrorCode()));
+    handler.CleanupWriter();
     return EXIT_FAILURE;
   }
-
-  // write location info
-  char lb[1024];
-  FileWriteStream reportStream(reportFile, lb, 1024);
-  PrettyWriter<FileWriteStream> reportWriter(reportStream);
-  reportWriter.SetIndent(' ', 2);
-  reportWriter.StartObject();
-  reportWriter.Key("counts");
-  reportWriter.StartArray();
-
-  for (auto magicPath : handler.pathsForCounting)
-  {
-    if (magicPath.schemaName == schemaName)
-    {
-      reportWriter.StartObject();
-      reportWriter.Key("path");
-      reportWriter.String(objectPathToString(magicPath.path));
-      reportWriter.Key("count");
-      reportWriter.Int(magicPath.count);
-      reportWriter.EndObject();
-    }
-  }
-  reportWriter.EndArray();
-  reportWriter.Key("reports");
-  reportWriter.StartArray();
-  for (auto magicPath : handler.pathsForReporting)
-  {
-    if (magicPath.schemaName == schemaName)
-    {
-      reportWriter.StartObject();
-      reportWriter.Key("path");
-      reportWriter.String(objectPathToString(magicPath.path));
-      reportWriter.Key("items");
-      reportWriter.StartArray();
-      std::list<string>::iterator locationIt = magicPath.locations.begin();
-      for (std::list<string>::iterator valueIt = magicPath.values.begin(); valueIt != magicPath.values.end(); ++valueIt)
-      {
-        reportWriter.StartObject();
-        reportWriter.Key("location");
-        reportWriter.String(*locationIt);
-        reportWriter.Key("value");
-        reportWriter.String(*valueIt);
-        reportWriter.EndObject();
-        ++locationIt;
-      }
-      reportWriter.EndArray();
-      reportWriter.EndObject();
-    }
-  }
-  reportWriter.EndArray();
-  reportWriter.EndObject();
-  reportWriter.Flush();
+  handler.CleanupWriter();
   if (reportOutput)
   {
     fclose(reportFile);
