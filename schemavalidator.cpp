@@ -181,6 +181,7 @@ string objectPathToString(list<string> &objectPath)
 string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
 {
   string result = "";
+  bool firstSegment = true;
   if (objectPath.size() == 0)
   {
     return result;
@@ -197,14 +198,26 @@ string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
       }
       else
       {
-        result.append(".");
+        if (firstSegment)
+        {
+          firstSegment = false;
+        }
+        else
+        {
+          result.append(".");
+        }
+
         result.append(pathPart.first);
       }
     }
   }
   if (lastPart != "")
   {
-    result.append(".");
+    if (!firstSegment)
+    {
+      result.append(".");
+    }
+
     result.append(lastPart);
   }
   return result;
@@ -335,11 +348,11 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 
   bool String(const Ch *str, SizeType len, bool copy)
   {
-    lastKey = "";
-    if (objectPath.size() > 0 && objectPath.back() == "[]")
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
     {
       objectPathWithArrayIndices.back().second++;
     }
+    lastKey = "";
     if (currentReport != NULL)
     {
       reportWriter->String(str);
