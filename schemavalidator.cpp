@@ -192,9 +192,8 @@ string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
     {
       if (pathPart.first == "[]")
       {
-        result.append("[");
+        result.append(".");
         result.append(to_string(pathPart.second));
-        result.append("]");
       }
       else
       {
@@ -234,8 +233,6 @@ struct ItemReporter
 {
   string schemaName;
   list<string> path;
-  list<string> values;
-  list<string> locations;
 };
 
 struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
@@ -255,8 +252,6 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   } state_;
   list<string> objectPath;
   list<pair<string, int>> objectPathWithArrayIndices;
-  list<string> inNetworkLocations;
-  list<string> additionalLocations;
   list<ItemCounter> pathsForCounting;
   list<ItemReporter> pathsForReporting;
   ItemReporter *currentReport;
@@ -266,18 +261,16 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 
   MessageHandler(string name, PrettyWriter<FileWriteStream> &reportFile)
   {
-    inNetworkLocations = {};
-    additionalLocations = {};
     objectPath = {};
     state_ = traversingObject;
     schemaName = name;
     // pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
     //                     {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
     pathsForCounting = {};
-    pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath, .values = {}, .locations = {}},
-                         {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath, .values = {}, .locations = {}},
-                         {.schemaName = "table-of-contents", .path = tocAllowedAmountPath, .values = {}, .locations = {}},
-                         {.schemaName = "table-of-contents", .path = tocInNetworkPath, .values = {}, .locations = {}}};
+    pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath},
+                         {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath},
+                         {.schemaName = "table-of-contents", .path = tocAllowedAmountPath},
+                         {.schemaName = "table-of-contents", .path = tocInNetworkPath}};
     reportWriter = &reportFile;
     reportWriter->StartObject();
     currentReport = NULL;
