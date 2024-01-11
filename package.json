@@ -1,6 +1,6 @@
 {
   "name": "cms-mrf-validator",
-  "version": "1.5.2",
+  "version": "2.1.0",
   "description": "Node-based entry point for machine-readable file validator",
   "main": "out/index.js",
   "bin": {
@@ -13,7 +13,7 @@
     "build": "del-cli out && tsc",
     "prettier": "prettier --check \"src/*.ts\"",
     "prepare": "npm run build",
-    "test": "jest --coverage"
+    "test": "node --expose-gc ./node_modules/jest/bin/jest --runInBand --logHeapUsage"
   },
   "repository": {
     "type": "git",

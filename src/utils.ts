@@ -70,8 +70,7 @@ export function isGzip(contentType: string, url: string): boolean {
 
 export function isZip(contentType: string, url: string): boolean {
   return (
-    contentType === 'application/zip' ||
-    (contentType === 'application/octet-stream' && /\.zip(\?|$)/.test(url))
+    contentType === 'application/zip' || /\.zip(\?|$)/.test(url)
   );
 }
 

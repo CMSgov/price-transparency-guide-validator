@@ -263,6 +263,24 @@ describe('DownloadManager', () => {
       expect(downloadedData).toEqual(simpleData);
     });
 
+    it('should write a json file within a zip when the response has content type application/x-zip-compressed and the url ends with .zip', async () => {
+      const simpleData = fs.readJsonSync(
+        path.join(__dirname, 'fixtures', 'simpleData.json'),
+        'utf-8'
+      );
+      const simpleZip = fs.readFileSync(path.join(__dirname, 'fixtures', 'simpleZip.zip'));
+      nock('http://example.org')
+        .get('/data.zip')
+        .reply(200, simpleZip, { 'content-type': 'application/x-zip-compressed' });
+      const dataPath = (await downloadManager.downloadDataFile(
+        'http://example.org/data.zip'
+      )) as string;
+      expect(dataPath).toBeString();
+      expect(fs.existsSync(dataPath));
+      const downloadedData = fs.readJsonSync(dataPath, 'utf-8');
+      expect(downloadedData).toEqual(simpleData);
+    });
+
     it('should write a json file within a zip when the response has content type application/octet-stream and the url ends with .zip followed by a query string', async () => {
       const simpleData = fs.readJsonSync(
         path.join(__dirname, 'fixtures', 'simpleData.json'),
