@@ -184,7 +184,7 @@ string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
   bool firstSegment = true;
   if (objectPath.size() == 0)
   {
-    return result;
+    return lastPart;
   }
   else
   {
@@ -222,13 +222,6 @@ string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
   return result;
 }
 
-struct ItemCounter
-{
-  string schemaName;
-  list<string> path;
-  int count;
-};
-
 struct ItemReporter
 {
   string schemaName;
@@ -243,6 +236,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   static list<string> negotiatedPricePath;
   static list<string> additionalInfoPath;
   static list<string> inNetworkProviderGroupsPath;
+  static list<string> lastUpdatedPath;
 
   enum State
   {
@@ -252,7 +246,6 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   } state_;
   list<string> objectPath;
   list<pair<string, int>> objectPathWithArrayIndices;
-  list<ItemCounter> pathsForCounting;
   list<ItemReporter> pathsForReporting;
   ItemReporter *currentReport;
   string lastKey;
@@ -264,12 +257,11 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     objectPath = {};
     state_ = traversingObject;
     schemaName = name;
-    // pathsForCounting = {{.schemaName = "in-network-rates", .path = negotiatedPricePath, .count = 0},
-    //                     {.schemaName = "in-network-rates", .path = additionalInfoPath, .count = 0}};
-    pathsForCounting = {};
     pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath},
                          {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath},
                          {.schemaName = "in-network-rates", .path = providerReferencePath},
+                         {.schemaName = "in-network-rates", .path = lastUpdatedPath},
+                         {.schemaName = "allowed-amounts", .path = lastUpdatedPath},
                          {.schemaName = "table-of-contents", .path = tocAllowedAmountPath},
                          {.schemaName = "table-of-contents", .path = tocInNetworkPath}};
     reportWriter = &reportFile;
@@ -297,16 +289,6 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   bool Key(const Ch *str, SizeType len, bool copy)
   {
     lastKey = string(str);
-    // check all counted things
-    // when processing a key, we can check paths that end with a key name
-    // for (auto &ic : pathsForCounting)
-    // {
-    //   if (schemaName == ic.schemaName && ic.path.back() != "[]" && almostThere(ic.path))
-    //   {
-    //     printf("found a count item by key! %s\n", objectPathToString(objectPath).c_str());
-    //     ++(ic.count);
-    //   }
-    // }
     // when we get to a key that matches a path up until the end,
     // we want to stream a report until the path no longer matches.
     // if currentReport is not null, check if it's still valid.
@@ -366,19 +348,6 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     {
       objectPath.push_back(lastKey);
       objectPathWithArrayIndices.push_back(make_pair(lastKey, -1));
-    }
-    else
-    {
-      // lastKey is empty, which means that this object is an element of an array.
-      // so, check paths that end with "[]", because they want to count up array elements.
-      for (auto &countPath : pathsForCounting)
-      {
-        if (schemaName == countPath.schemaName && countPath.path.back() == "[]" && countPath.path == objectPath)
-        {
-          printf("found an item in an array! %s\n", objectPathToString(countPath.path).c_str());
-          ++(countPath.count);
-        }
-      }
     }
     if (currentReport != NULL)
     {
@@ -620,6 +589,7 @@ list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]"
 // list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
 list<string> MessageHandler::additionalInfoPath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "additional_information"};
 list<string> MessageHandler::inNetworkProviderGroupsPath = {"in_network", "[]", "negotiated_rates", "[]", "provider_groups"};
+list<string> MessageHandler::lastUpdatedPath = {"last_updated_on"};
 
 int main(int argc, char *argv[])
 {
