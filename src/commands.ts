@@ -1,6 +1,7 @@
 import util from 'util';
 import path from 'path';
 import { exec } from 'child_process';
+import os from 'os';
 import fs from 'fs-extra';
 import readlineSync from 'readline-sync';
 import { OptionValues } from 'commander';
@@ -25,6 +26,7 @@ export async function validate(dataFile: string, options: OptionValues) {
     process.exitCode = 1;
     return;
   }
+  fs.ensureDirSync(options.out);
   const schemaManager = new SchemaManager();
   await schemaManager.ensureRepo();
   schemaManager.strict = options.strict;
@@ -65,9 +67,10 @@ export async function validate(dataFile: string, options: OptionValues) {
         const containerResult = await dockerManager.runContainer(
           schemaPath,
           options.target,
-          dataFile
+          dataFile,
+          `file://${dataFile}`
         );
-        if (containerResult.pass) {
+        if (containerResult.pass || true) {
           if (options.target === 'table-of-contents') {
             const providerReferences = await assessTocContents(
               containerResult.locations,
@@ -92,6 +95,11 @@ export async function validate(dataFile: string, options: OptionValues) {
               downloadManager
             );
           }
+          // make index file
+          const indexContents = dockerManager.processedUrls
+            .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
+            .join(os.EOL);
+          fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
         }
       } else {
         logger.error('No schema available - not validating.');
@@ -107,6 +115,7 @@ export async function validate(dataFile: string, options: OptionValues) {
 
 export async function validateFromUrl(dataUrl: string, options: OptionValues) {
   temp.track();
+  fs.ensureDirSync(options.out);
   const downloadManager = new DownloadManager(options.yesAll);
   if (await downloadManager.checkDataUrl(dataUrl)) {
     const schemaManager = new SchemaManager();
@@ -127,9 +136,10 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
             const containerResult = await dockerManager.runContainer(
               schemaPath,
               options.target,
-              dataFile
+              dataFile,
+              dataUrl
             );
-            if (containerResult.pass) {
+            if (containerResult.pass || true) {
               if (options.target === 'table-of-contents') {
                 const providerReferences = await assessTocContents(
                   containerResult.locations,
@@ -162,13 +172,23 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
             while (continuation === true) {
               const chosenEntry = chooseJsonFile(dataFile.jsonEntries);
               await getEntryFromZip(dataFile.zipFile, chosenEntry, dataFile.dataPath);
-              await dockerManager.runContainer(schemaPath, options.target, dataFile.dataPath);
+              await dockerManager.runContainer(
+                schemaPath,
+                options.target,
+                dataFile.dataPath,
+                `${dataUrl}:${chosenEntry.fileName}` // TODO see if this is actually useful
+              );
               continuation = readlineSync.keyInYNStrict(
                 'Would you like to validate another file in the ZIP?'
               );
             }
             dataFile.zipFile.close();
           }
+          // make index file
+          const indexContents = dockerManager.processedUrls
+            .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
+            .join(os.EOL);
+          fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
         } else {
           logger.error('No schema available - not validating.');
           process.exitCode = 1;

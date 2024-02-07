@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs-extra';
 import temp from 'temp';
 import yauzl from 'yauzl';
-import { EOL } from 'os';
 import { DockerManager } from './DockerManager';
 import { SchemaManager } from './SchemaManager';
 import { logger } from './logger';
@@ -69,9 +68,7 @@ export function isGzip(contentType: string, url: string): boolean {
 }
 
 export function isZip(contentType: string, url: string): boolean {
-  return (
-    contentType === 'application/zip' || /\.zip(\?|$)/.test(url)
-  );
+  return contentType === 'application/zip' || /\.zip(\?|$)/.test(url);
 }
 
 export function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
@@ -250,6 +247,10 @@ async function validateInNetworkFixedVersion(
   await schemaManager.useSchema('in-network-rates').then(async schemaPath => {
     if (schemaPath != null) {
       for (const dataUrl of inNetwork) {
+        if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
+          logger.info(`File ${dataUrl} already processed, skipping...`);
+          continue;
+        }
         try {
           if (await downloadManager.checkDataUrl(dataUrl)) {
             logger.info(`File: ${dataUrl}`);
@@ -271,7 +272,7 @@ async function validateInNetworkFixedVersion(
                 schemaPath,
                 'in-network-rates',
                 dataPath,
-                tempOutput
+                dataUrl
               );
               if (
                 containedResult.pass &&
@@ -279,13 +280,6 @@ async function validateInNetworkFixedVersion(
               ) {
                 containedResult.locations.providerReference.forEach(prf =>
                   providerReferences.add(prf)
-                );
-              }
-              if (tempOutput.length > 0) {
-                appendResults(
-                  tempOutput,
-                  dockerManager.outputPath,
-                  `${dataUrl} - in-network${EOL}`
                 );
               }
             }
@@ -312,6 +306,10 @@ async function validateInNetworkDetectedVersion(
 ) {
   const providerReferences: Set<string> = new Set<string>();
   for (const dataUrl of inNetwork) {
+    if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
+      logger.info(`File ${dataUrl} already processed, skipping...`);
+      continue;
+    }
     try {
       if (await downloadManager.checkDataUrl(dataUrl)) {
         logger.info(`File: ${dataUrl}`);
@@ -333,7 +331,7 @@ async function validateInNetworkDetectedVersion(
                   schemaPath,
                   'in-network-rates',
                   dataPath,
-                  tempOutput
+                  dataUrl
                 );
               }
             })
@@ -344,13 +342,6 @@ async function validateInNetworkDetectedVersion(
               ) {
                 containedResult.locations.providerReference.forEach(prf =>
                   providerReferences.add(prf)
-                );
-              }
-              if (tempOutput.length > 0) {
-                appendResults(
-                  tempOutput,
-                  dockerManager.outputPath,
-                  `${dataUrl} - in-network${EOL}`
                 );
               }
             });
@@ -373,6 +364,10 @@ async function validateAllowedAmountsFixedVersion(
   await schemaManager.useSchema('allowed-amounts').then(async schemaPath => {
     if (schemaPath != null) {
       for (const dataUrl of allowedAmount) {
+        if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
+          logger.info(`File ${dataUrl} already processed, skipping...`);
+          continue;
+        }
         try {
           if (await downloadManager.checkDataUrl(dataUrl)) {
             logger.info(`File: ${dataUrl}`);
@@ -390,14 +385,7 @@ async function validateAllowedAmountsFixedVersion(
                   }
                 })
                 .catch(() => {});
-              await dockerManager.runContainer(schemaPath, 'allowed-amounts', dataPath, tempOutput);
-              if (tempOutput.length > 0) {
-                appendResults(
-                  tempOutput,
-                  dockerManager.outputPath,
-                  `${dataUrl} - allowed-amounts${EOL}`
-                );
-              }
+              await dockerManager.runContainer(schemaPath, 'allowed-amounts', dataPath, dataUrl);
             }
           } else {
             logger.error(`Could not download file: ${dataUrl}`);
@@ -420,6 +408,10 @@ async function validateAllowedAmountsDetectedVersion(
   tempOutput: string
 ) {
   for (const dataUrl of allowedAmount) {
+    if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
+      logger.info(`File ${dataUrl} already processed, skipping...`);
+      continue;
+    }
     try {
       if (await downloadManager.checkDataUrl(dataUrl)) {
         logger.info(`File: ${dataUrl}`);
@@ -437,23 +429,10 @@ async function validateAllowedAmountsDetectedVersion(
             })
             .then(schemaPath => {
               if (schemaPath != null) {
-                return dockerManager.runContainer(
-                  schemaPath,
-                  'allowed-amounts',
-                  dataPath,
-                  tempOutput
-                );
+                return dockerManager.runContainer(schemaPath, 'allowed-amounts', dataPath, dataUrl);
               }
             })
-            .then(_containedResult => {
-              if (tempOutput.length > 0) {
-                appendResults(
-                  tempOutput,
-                  dockerManager.outputPath,
-                  `${dataUrl} - allowed-amounts${EOL}`
-                );
-              }
-            });
+            .then(_containedResult => {});
         }
       }
     } catch (err) {
@@ -470,7 +449,7 @@ export async function assessReferencedProviders(
 ) {
   if (providerReferences.length > 0) {
     const fileText = providerReferences.length === 1 ? 'this file' : 'these files';
-    if (providerReferences.length === 1) {
+    if (providerReferences.length > 1) {
       logger.info(`In-network file(s) refer to ${fileText}:`);
       logger.info('== Provider Reference ==');
       providerReferences.forEach(prf => logger.info(`* ${prf}`));
@@ -504,6 +483,10 @@ export async function validateReferencedProviders(
     schemaManager.useSchema('provider-reference').then(async schemaPath => {
       if (schemaPath != null) {
         for (const dataUrl of providerReferences) {
+          if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
+            logger.info(`File ${dataUrl} already processed, skipping...`);
+            continue;
+          }
           try {
             if (await downloadManager.checkDataUrl(dataUrl)) {
               logger.info(`File: ${dataUrl}`);
@@ -513,15 +496,8 @@ export async function validateReferencedProviders(
                   schemaPath,
                   'provider-reference',
                   dataPath,
-                  tempOutput
+                  dataUrl
                 );
-                if (tempOutput.length > 0) {
-                  appendResults(
-                    tempOutput,
-                    dockerManager.outputPath,
-                    `${dataUrl} - provider-reference${EOL}`
-                  );
-                }
               }
             } else {
               logger.error(`Could not download file: ${dataUrl}`);
