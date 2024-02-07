@@ -269,6 +269,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     pathsForCounting = {};
     pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath},
                          {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath},
+                         {.schemaName = "in-network-rates", .path = providerReferencePath},
                          {.schemaName = "table-of-contents", .path = tocAllowedAmountPath},
                          {.schemaName = "table-of-contents", .path = tocInNetworkPath}};
     reportWriter = &reportFile;
@@ -444,6 +445,146 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     return BaseReaderHandler::EndArray(len);
   }
 
+  bool Null()
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Null();
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Null();
+  }
+
+  bool Bool(bool b)
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Bool(b);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Bool(b);
+  }
+
+  bool Int(int i)
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Int(i);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Int(i);
+  }
+
+  bool Uint(unsigned i)
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Uint(i);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Uint(i);
+  }
+
+  bool Int64(int64_t i)
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Int64(i);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Int64(i);
+  }
+
+  bool Uint64(uint64_t i)
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Uint64(i);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Uint64(i);
+  }
+
+  bool Double(double d)
+  {
+    if (objectPath.size() > 0 && objectPath.back() == "[]" && lastKey == "")
+    {
+      objectPathWithArrayIndices.back().second++;
+    }
+    lastKey = "";
+    if (currentReport != NULL)
+    {
+      reportWriter->Double(d);
+      // if our path is to this exactly, we should stop reporting
+      if (!almostThere(currentReport->path))
+      {
+        currentReport = NULL;
+      }
+    }
+
+    return BaseReaderHandler::Double(d);
+  }
+
   bool almostThere(list<string> &targetPath)
   {
     // true if objectPath + [lastKey] matches targetPath until the end of targetPath is reached
@@ -473,7 +614,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   }
 };
 
-// list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
+list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
 list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files"};
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
 // list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
@@ -630,7 +771,7 @@ int main(int argc, char *argv[])
     return -1;
   }
   FileReadStream is(fp2, buffer, sizeof(buffer));
-  if (!reader.Parse<kParseNumbersAsStringsFlag, FileReadStream, GenericSchemaValidator<SchemaDocument, MessageHandler>>(is, validator) && reader.GetParseErrorCode() != kParseErrorTermination)
+  if (!reader.Parse<kParseDefaultFlags, FileReadStream, GenericSchemaValidator<SchemaDocument, MessageHandler>>(is, validator) && reader.GetParseErrorCode() != kParseErrorTermination)
   {
     // Schema validator error would cause kParseErrorTermination, which will handle it in next step.
     fprintf(errFile, "Input is not a valid JSON\n");
@@ -672,7 +813,7 @@ int main(int argc, char *argv[])
     sb.Clear();
     PrettyWriter<StringBuffer> w(sb);
     validator.GetError().Accept(w);
-    fprintf(errJsonFile, sb.GetString());
+    // fprintf(errJsonFile, "%s", sb.GetString());
     CreateErrorMessages(validator.GetError(), outFile);
     if (fileOutput)
     {
