@@ -1,4 +1,4 @@
-import util from 'util';
+import util, { isArray } from 'util';
 import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
@@ -36,7 +36,6 @@ export class DockerManager {
         temp.track();
         const outputDir = temp.mkdirSync('output');
         const containerOutputPath = path.join(outputDir, 'output.txt');
-        const containerReportsPath = path.join(outputDir, 'reports.json');
         // copy output files after it finishes
         const runCommand = this.buildRunCommand(schemaPath, dataPath, outputDir, schemaName);
         logger.info('Running validator container...');
@@ -45,7 +44,7 @@ export class DockerManager {
           .promisify(exec)(runCommand)
           .then(() => {
             this.processedUrls.push({ uri: dataUri, schema: schemaName });
-            const containerResult: ContainerResult = { pass: true };
+            const containerResult: ContainerResult = { pass: true, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
               if (this.outputPath) {
                 fs.copySync(
@@ -57,48 +56,13 @@ export class DockerManager {
                 logger.info(outputText);
               }
             }
-            if (fs.existsSync(containerReportsPath)) {
-              if (this.outputPath) {
-                fs.copySync(
-                  containerReportsPath,
-                  path.join(this.outputPath, `reports${this.processedUrls.length}.json`)
-                );
-              }
-              try {
-                if (schemaName === 'table-of-contents') {
-                  // if key ends with .allowed_amount_file: it's an object, grab .location
-                  // if key ends with .in_network_files: it's an array, foreach grab .location
-                  const reports = fs.readJsonSync(containerReportsPath);
-                  containerResult.locations = { allowedAmount: [], inNetwork: [] };
-                  Object.keys(reports).forEach((key: string) => {
-                    if (key.endsWith('.allowed_amount_file') && reports[key].location != null) {
-                      containerResult.locations.allowedAmount.push(reports[key].location);
-                    } else if (key.endsWith('.in_network_files')) {
-                      reports[key]?.forEach((inNetwork: any) => {
-                        if (inNetwork?.location != null) {
-                          containerResult.locations.inNetwork.push(inNetwork.location);
-                        }
-                      });
-                    }
-                  });
-                } else if (schemaName === 'in-network-rates') {
-                  // if key ends with .location: it's a string, grab it
-                  const reports = fs.readJsonSync(containerReportsPath);
-                  containerResult.locations = { providerReference: [] };
-                  Object.keys(reports).forEach((key: string) => {
-                    if (key.endsWith('.location')) {
-                      containerResult.locations.providerReference.push(reports[key]);
-                    }
-                  });
-                }
-              } catch (err) {
-                // don't know either
-              }
-            }
+            // look at all the json files in the output dir to get them organized
+            this.moveReports(outputDir, schemaName, containerResult);
             return containerResult;
           })
           .catch((..._zagwo) => {
             this.processedUrls.push({ uri: dataUri, schema: schemaName });
+            const containerResult: ContainerResult = { pass: false, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
               if (this.outputPath) {
                 fs.copySync(
@@ -110,8 +74,9 @@ export class DockerManager {
                 logger.info(outputText);
               }
             }
+            this.moveReports(outputDir, schemaName, containerResult);
             process.exitCode = 1;
-            return { pass: false };
+            return containerResult;
           });
       } else {
         logger.error('Could not find a validator docker container.');
@@ -123,6 +88,52 @@ export class DockerManager {
       process.exitCode = 1;
       return { pass: false };
     }
+  }
+
+  private moveReports(outputDir: string, schemaName: string, containerResult: ContainerResult) {
+    fs.readdirSync(outputDir).forEach(reportFile => {
+      if (reportFile.endsWith('.json') && reportFile != 'errors.json') {
+        if (this.outputPath) {
+          fs.copySync(
+            path.join(outputDir, reportFile),
+            path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
+          );
+        }
+      }
+      if (schemaName === 'table-of-contents') {
+        if (reportFile === 'allowedAmountFiles.json') {
+          const allowedAmountFiles = fs.readJsonSync(path.join(outputDir, reportFile));
+          containerResult.locations.allowedAmount = [];
+          Object.keys(allowedAmountFiles).forEach((key: string) => {
+            if (typeof allowedAmountFiles[key].location === 'string') {
+              containerResult.locations.allowedAmount.push(allowedAmountFiles[key].location);
+            }
+          });
+        } else if (reportFile === 'inNetworkFiles.json') {
+          const inNetworkFiles = fs.readJsonSync(path.join(outputDir, reportFile));
+          containerResult.locations.inNetwork = [];
+          Object.keys(inNetworkFiles).forEach((key: string) => {
+            if (Array.isArray(inNetworkFiles[key])) {
+              inNetworkFiles[key].forEach((entry: any) => {
+                if (typeof entry.location === 'string') {
+                  containerResult.locations.inNetwork.push(entry.location);
+                }
+              });
+            }
+          });
+        }
+      } else if (schemaName === 'in-network-rates' && reportFile === 'providerReferences.json') {
+        const providerReferenceFiles = fs.readJsonSync(path.join(outputDir, reportFile));
+        containerResult.locations.providerReference = [];
+        Object.keys(providerReferenceFiles).forEach(
+          (key: string) => {
+            if (typeof providerReferenceFiles[key] === 'string') {
+              containerResult.locations.providerReference.push(providerReferenceFiles[key])
+            } 
+          }
+        );
+      }
+    });
   }
 
   buildRunCommand(

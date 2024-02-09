@@ -57,8 +57,7 @@ export class DownloadManager {
   }
 
   async downloadDataFile(url: string, folder = this.folder): Promise<string | ZipContents> {
-    const filenameGuess = 'data.json';
-    const dataPath = path.join(folder, filenameGuess);
+    const dataPath = path.join(folder, 'data.json');
     return new Promise((resolve, reject) => {
       logger.info('Beginning download...\n');
       axios({
@@ -143,10 +142,10 @@ export class DownloadManager {
               logger.info('Download complete.');
               resolve(dataPath);
             });
-            outputStream.on('error', () => {
+            outputStream.on('error', err => {
+              logger.error(err);
               reject('Error writing downloaded file.');
             });
-
             if (isGzip(contentType, finalUrl)) {
               pipeline(response.data, createGunzip(), outputStream);
             } else {

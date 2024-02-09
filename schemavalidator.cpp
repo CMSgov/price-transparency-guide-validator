@@ -224,8 +224,12 @@ string objectPathToString(list<pair<string, int>> &objectPath, string lastPart)
 
 struct ItemReporter
 {
-  string schemaName;
+  string fileName;
   list<string> path;
+  FILE *reportFile;
+  PrettyWriter<FileWriteStream> *reportWriter;
+  FileWriteStream *reportStream;
+  char *buffer;
 };
 
 struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
@@ -250,39 +254,53 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   ItemReporter *currentReport;
   string lastKey;
   string schemaName;
-  PrettyWriter<FileWriteStream> *reportWriter;
 
-  MessageHandler(string name, PrettyWriter<FileWriteStream> &reportFile)
+  MessageHandler(string name, filesystem::path outputDir)
   {
     objectPath = {};
     state_ = traversingObject;
     schemaName = name;
-    pathsForReporting = {{.schemaName = "in-network-rates", .path = additionalInfoPath},
-                         {.schemaName = "in-network-rates", .path = inNetworkProviderGroupsPath},
-                         {.schemaName = "in-network-rates", .path = providerReferencePath},
-                         {.schemaName = "in-network-rates", .path = lastUpdatedPath},
-                         {.schemaName = "allowed-amounts", .path = lastUpdatedPath},
-                         {.schemaName = "table-of-contents", .path = tocAllowedAmountPath},
-                         {.schemaName = "table-of-contents", .path = tocInNetworkPath}};
-    reportWriter = &reportFile;
-    reportWriter->StartObject();
-    currentReport = NULL;
-  }
-
-  ~MessageHandler()
-  {
-    if (reportWriter != NULL)
+    if (name == "in-network-rates")
     {
-      reportWriter->Flush();
+      pathsForReporting = {{.fileName = "additionalInfo.json", .path = additionalInfoPath},
+                           {.fileName = "providerGroups.json", .path = inNetworkProviderGroupsPath},
+                           {.fileName = "providerReferences.json", .path = providerReferencePath},
+                           {.fileName = "lastUpdated.json", .path = lastUpdatedPath}};
     }
+    else if (name == "allowed-amounts")
+    {
+      pathsForReporting = {{.fileName = "lastUpdated.json", .path = lastUpdatedPath}};
+    }
+    else if (name == "table-of-contents")
+    {
+      pathsForReporting = {{.fileName = "allowedAmountFiles.json", .path = tocAllowedAmountPath},
+                           {.fileName = "inNetworkFiles.json", .path = tocInNetworkPath}};
+    }
+    for (auto &ir : pathsForReporting)
+    {
+      ir.buffer = new char[1024];
+      ir.reportFile = fopen((outputDir / ir.fileName).c_str(), "w");
+      ir.reportStream = new FileWriteStream(ir.reportFile, ir.buffer, 1024);
+      ir.reportWriter = new PrettyWriter<FileWriteStream>(*(ir.reportStream));
+      ir.reportWriter->SetIndent(' ', 2);
+      ir.reportWriter->StartObject();
+    }
+    currentReport = NULL;
   }
 
   void CleanupWriter()
   {
-    if (reportWriter != NULL)
+    for (auto &ir : pathsForReporting)
     {
-      reportWriter->EndObject();
-      reportWriter->Flush();
+      if (ir.reportWriter != NULL)
+      {
+        ir.reportWriter->EndObject();
+        ir.reportWriter->Flush();
+        delete ir.reportWriter;
+        delete ir.reportStream;
+        fclose(ir.reportFile);
+        delete ir.buffer;
+      }
     }
   }
 
@@ -298,7 +316,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     {
       if (almostThere(currentReport->path))
       {
-        reportWriter->Key(lastKey);
+        currentReport->reportWriter->Key(lastKey);
       }
       else
       {
@@ -311,10 +329,11 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     {
       for (auto &ir : pathsForReporting)
       {
-        if (schemaName == ir.schemaName && ir.path.back() != "[]" && almostThere(ir.path))
+        if (/*schemaName == ir.schemaName &&*/ ir.path.back() != "[]" && almostThere(ir.path))
         {
-          reportWriter->Key(objectPathToString(objectPathWithArrayIndices, lastKey));
+
           currentReport = (&ir);
+          currentReport->reportWriter->Key(objectPathToString(objectPathWithArrayIndices, lastKey));
           break;
         }
       }
@@ -331,7 +350,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->String(str);
+      currentReport->reportWriter->String(str);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -351,7 +370,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     }
     if (currentReport != NULL)
     {
-      reportWriter->StartObject();
+      currentReport->reportWriter->StartObject();
     }
     return BaseReaderHandler::StartObject();
   }
@@ -372,7 +391,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->EndObject();
+      currentReport->reportWriter->EndObject();
       if (!almostThere(currentReport->path))
       {
         currentReport = NULL;
@@ -390,7 +409,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->StartArray();
+      currentReport->reportWriter->StartArray();
     }
     return BaseReaderHandler::StartArray();
   }
@@ -405,7 +424,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->EndArray();
+      currentReport->reportWriter->EndArray();
       if (!almostThere(currentReport->path))
       {
         currentReport = NULL;
@@ -423,7 +442,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Null();
+      currentReport->reportWriter->Null();
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -443,7 +462,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Bool(b);
+      currentReport->reportWriter->Bool(b);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -463,7 +482,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Int(i);
+      currentReport->reportWriter->Int(i);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -483,7 +502,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Uint(i);
+      currentReport->reportWriter->Uint(i);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -503,7 +522,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Int64(i);
+      currentReport->reportWriter->Int64(i);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -523,7 +542,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Uint64(i);
+      currentReport->reportWriter->Uint64(i);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -543,7 +562,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     lastKey = "";
     if (currentReport != NULL)
     {
-      reportWriter->Double(d);
+      currentReport->reportWriter->Double(d);
       // if our path is to this exactly, we should stop reporting
       if (!almostThere(currentReport->path))
       {
@@ -631,11 +650,9 @@ int main(int argc, char *argv[])
 
   // if an output file is specified, try to open it for writing
   FILE *outFile;
-  FILE *reportFile;
   FILE *errFile;
   FILE *errJsonFile;
   bool fileOutput = false;
-  bool reportOutput = false;
   if (outputPath.length() > 0)
   {
     if (!filesystem::exists(outputPath))
@@ -653,16 +670,6 @@ int main(int argc, char *argv[])
       printf("Could not open output file in '%s' for output\n", outputPath.c_str());
       return -1;
     }
-    reportFile = fopen((filesystem::path(outputPath) / "reports.json").c_str(), "w");
-    if (!reportFile)
-    {
-      printf("Could not create report output file. Reported information will not be saved to file.");
-      reportFile = stdout;
-    }
-    else
-    {
-      reportOutput = true;
-    }
     errJsonFile = fopen((filesystem::path(outputPath) / "errors.json").c_str(), "w");
     if (!errJsonFile)
     {
@@ -675,7 +682,6 @@ int main(int argc, char *argv[])
   else
   {
     outFile = stdout;
-    reportFile = stdout;
     errFile = stderr;
     errJsonFile = stderr;
   }
@@ -717,11 +723,7 @@ int main(int argc, char *argv[])
   SchemaDocument sd(d);
 
   // Use reader to parse the JSON in stdin, and forward SAX events to validator
-  char lb[1024];
-  FileWriteStream reportStream(reportFile, lb, 1024);
-  PrettyWriter<FileWriteStream> reportWriter(reportStream);
-  reportWriter.SetIndent(' ', 2);
-  MessageHandler handler(schemaName, reportWriter);
+  MessageHandler handler(schemaName, (filesystem::path(outputPath)));
   GenericSchemaValidator<SchemaDocument, MessageHandler> validator(sd, handler);
   // set validator flags
   if (!failFast)
@@ -752,10 +754,6 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
   handler.CleanupWriter();
-  if (reportOutput)
-  {
-    fclose(reportFile);
-  }
   // Check the validation result
   if (validator.IsValid())
   {
@@ -783,7 +781,7 @@ int main(int argc, char *argv[])
     sb.Clear();
     PrettyWriter<StringBuffer> w(sb);
     validator.GetError().Accept(w);
-    // fprintf(errJsonFile, "%s", sb.GetString());
+    fprintf(errJsonFile, "%s", sb.GetString());
     CreateErrorMessages(validator.GetError(), outFile);
     if (fileOutput)
     {

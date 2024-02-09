@@ -274,10 +274,7 @@ async function validateInNetworkFixedVersion(
                 dataPath,
                 dataUrl
               );
-              if (
-                containedResult.pass &&
-                containedResult.locations?.providerReference?.length > 0
-              ) {
+              if (containedResult.locations?.providerReference?.length > 0) {
                 containedResult.locations.providerReference.forEach(prf =>
                   providerReferences.add(prf)
                 );
@@ -336,10 +333,7 @@ async function validateInNetworkDetectedVersion(
               }
             })
             .then(containedResult => {
-              if (
-                containedResult.pass &&
-                containedResult.locations?.providerReference?.length > 0
-              ) {
+              if (containedResult.locations?.providerReference?.length > 0) {
                 containedResult.locations.providerReference.forEach(prf =>
                   providerReferences.add(prf)
                 );
@@ -449,21 +443,19 @@ export async function assessReferencedProviders(
 ) {
   if (providerReferences.length > 0) {
     const fileText = providerReferences.length === 1 ? 'this file' : 'these files';
-    if (providerReferences.length > 1) {
-      logger.info(`In-network file(s) refer to ${fileText}:`);
-      logger.info('== Provider Reference ==');
-      providerReferences.forEach(prf => logger.info(`* ${prf}`));
-      const wantToValidateProviders =
-        downloadManager.alwaysYes ||
-        readlineSync.keyInYNStrict(`Would you like to validate ${fileText}?`);
-      if (wantToValidateProviders) {
-        await validateReferencedProviders(
-          providerReferences,
-          schemaManager,
-          dockerManager,
-          downloadManager
-        );
-      }
+    logger.info(`In-network file(s) refer to ${fileText}:`);
+    logger.info('== Provider Reference ==');
+    providerReferences.forEach(prf => logger.info(`* ${prf}`));
+    const wantToValidateProviders =
+      downloadManager.alwaysYes ||
+      readlineSync.keyInYNStrict(`Would you like to validate ${fileText}?`);
+    if (wantToValidateProviders) {
+      await validateReferencedProviders(
+        providerReferences,
+        schemaManager,
+        dockerManager,
+        downloadManager
+      );
     }
   }
 }
@@ -480,7 +472,7 @@ export async function validateReferencedProviders(
     tempOutput = path.join(temp.mkdirSync('providers'), 'contained-result');
   }
   if (providerReferences.length > 0) {
-    schemaManager.useSchema('provider-reference').then(async schemaPath => {
+    await schemaManager.useSchema('provider-reference').then(async schemaPath => {
       if (schemaPath != null) {
         for (const dataUrl of providerReferences) {
           if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
