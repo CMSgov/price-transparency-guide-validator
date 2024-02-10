@@ -237,8 +237,8 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   static list<string> providerReferencePath;
   static list<string> tocInNetworkPath;
   static list<string> tocAllowedAmountPath;
-  static list<string> negotiatedPricePath;
   static list<string> additionalInfoPath;
+  static list<string> negotiatedTypePath;
   static list<string> inNetworkProviderGroupsPath;
   static list<string> lastUpdatedPath;
 
@@ -263,6 +263,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
     if (name == "in-network-rates")
     {
       pathsForReporting = {{.fileName = "additionalInfo.json", .path = additionalInfoPath},
+                           {.fileName = "negotiatedType.json", .path = negotiatedTypePath},
                            {.fileName = "providerGroups.json", .path = inNetworkProviderGroupsPath},
                            {.fileName = "providerReferences.json", .path = providerReferencePath},
                            {.fileName = "lastUpdated.json", .path = lastUpdatedPath}};
@@ -605,8 +606,8 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
 list<string> MessageHandler::providerReferencePath = {"provider_references", "[]", "location"};
 list<string> MessageHandler::tocInNetworkPath = {"reporting_structure", "[]", "in_network_files"};
 list<string> MessageHandler::tocAllowedAmountPath = {"reporting_structure", "[]", "allowed_amount_file"};
-// list<string> MessageHandler::negotiatedPricePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]"};
 list<string> MessageHandler::additionalInfoPath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "additional_information"};
+list<string> MessageHandler::negotiatedTypePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "negotiated_type"};
 list<string> MessageHandler::inNetworkProviderGroupsPath = {"in_network", "[]", "negotiated_rates", "[]", "provider_groups"};
 list<string> MessageHandler::lastUpdatedPath = {"last_updated_on"};
 
