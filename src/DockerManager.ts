@@ -7,7 +7,7 @@ import { logger } from './logger';
 
 export class DockerManager {
   containerId = '';
-  processedUrls: { uri: string; schema: string }[] = [];
+  processedUrls: { uri: string; schema: string; size: number }[] = [];
 
   constructor(public outputPath = './') {}
 
@@ -36,6 +36,7 @@ export class DockerManager {
         temp.track();
         const outputDir = temp.mkdirSync('output');
         const containerOutputPath = path.join(outputDir, 'output.txt');
+        const dataSize = fs.statSync(dataPath).size;
         // copy output files after it finishes
         const runCommand = this.buildRunCommand(schemaPath, dataPath, outputDir, schemaName);
         logger.info('Running validator container...');
@@ -43,7 +44,7 @@ export class DockerManager {
         return util
           .promisify(exec)(runCommand)
           .then(() => {
-            this.processedUrls.push({ uri: dataUri, schema: schemaName });
+            this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
             const containerResult: ContainerResult = { pass: true, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
               if (this.outputPath) {
@@ -61,7 +62,7 @@ export class DockerManager {
             return containerResult;
           })
           .catch((..._zagwo) => {
-            this.processedUrls.push({ uri: dataUri, schema: schemaName });
+            this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
             const containerResult: ContainerResult = { pass: false, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
               if (this.outputPath) {
@@ -125,13 +126,11 @@ export class DockerManager {
       } else if (schemaName === 'in-network-rates' && reportFile === 'providerReferences.json') {
         const providerReferenceFiles = fs.readJsonSync(path.join(outputDir, reportFile));
         containerResult.locations.providerReference = [];
-        Object.keys(providerReferenceFiles).forEach(
-          (key: string) => {
-            if (typeof providerReferenceFiles[key] === 'string') {
-              containerResult.locations.providerReference.push(providerReferenceFiles[key])
-            } 
+        Object.keys(providerReferenceFiles).forEach((key: string) => {
+          if (typeof providerReferenceFiles[key] === 'string') {
+            containerResult.locations.providerReference.push(providerReferenceFiles[key]);
           }
-        );
+        });
       }
     });
   }

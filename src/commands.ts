@@ -11,7 +11,8 @@ import {
   chooseJsonFile,
   getEntryFromZip,
   assessTocContents,
-  assessReferencedProviders
+  assessReferencedProviders,
+  writeIndexFile
 } from './utils';
 import temp from 'temp';
 import { SchemaManager } from './SchemaManager';
@@ -96,10 +97,11 @@ export async function validate(dataFile: string, options: OptionValues) {
             );
           }
           // make index file
-          const indexContents = dockerManager.processedUrls
-            .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
-            .join(os.EOL);
-          fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
+          writeIndexFile(dockerManager.processedUrls, options.out);
+          // const indexContents = dockerManager.processedUrls
+          //   .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
+          //   .join(os.EOL);
+          // fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
         }
       } else {
         logger.error('No schema available - not validating.');
@@ -185,10 +187,11 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
             dataFile.zipFile.close();
           }
           // make index file
-          const indexContents = dockerManager.processedUrls
-            .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
-            .join(os.EOL);
-          fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
+          writeIndexFile(dockerManager.processedUrls, options.out);
+          // const indexContents = dockerManager.processedUrls
+          //   .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
+          //   .join(os.EOL);
+          // fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
         } else {
           logger.error('No schema available - not validating.');
           process.exitCode = 1;

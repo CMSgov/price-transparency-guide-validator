@@ -1,4 +1,5 @@
 import readlineSync from 'readline-sync';
+import os from 'os';
 import path from 'path';
 import fs from 'fs-extra';
 import temp from 'temp';
@@ -7,6 +8,9 @@ import { DockerManager } from './DockerManager';
 import { SchemaManager } from './SchemaManager';
 import { logger } from './logger';
 import { DownloadManager } from './DownloadManager';
+
+const ONE_KILOBYTE = 1024;
+const ONE_MEGABYTE = 1024 * ONE_KILOBYTE;
 
 export type ZipContents = {
   zipFile: yauzl.ZipFile;
@@ -503,4 +507,31 @@ export async function validateReferencedProviders(
       }
     });
   }
+}
+
+export function writeIndexFile(urls: DockerManager['processedUrls'], outputDir: string) {
+  const schemaSizeTotals = new Map<string, number>();
+  const indexContents = urls
+    .map((record, index) => {
+      let size: string;
+      if (record.size > ONE_MEGABYTE) {
+        size = `${record.size / ONE_MEGABYTE}MB`;
+      } else if (record.size > ONE_KILOBYTE) {
+        size = `${record.size / ONE_KILOBYTE}KB`;
+      } else {
+        size = `${record.size}B`;
+      }
+      schemaSizeTotals.set(record.schema, (schemaSizeTotals.get(record.schema) ?? 0) + record.size);
+      return `${index + 1}\t${record.schema}\t${record.uri}\t${size}`;
+    })
+    .join(os.EOL);
+  const sizeInfo = [...schemaSizeTotals.entries()]
+    .map(([schema, size]) => {
+      return `${schema}: ${size / ONE_MEGABYTE}MB`;
+    })
+    .join(os.EOL);
+  fs.writeFileSync(
+    path.join(outputDir, 'result-index.txt'),
+    `${indexContents}${os.EOL}${os.EOL}${sizeInfo}`
+  );
 }
