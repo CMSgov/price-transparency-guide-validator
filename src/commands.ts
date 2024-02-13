@@ -167,6 +167,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                 );
               }
             }
+            writeIndexFile(dockerManager.processedUrls, options.out);
             return containerResult;
           } else {
             let continuation = true;
@@ -185,13 +186,8 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
               );
             }
             dataFile.zipFile.close();
+            writeIndexFile(dockerManager.processedUrls, options.out);
           }
-          // make index file
-          writeIndexFile(dockerManager.processedUrls, options.out);
-          // const indexContents = dockerManager.processedUrls
-          //   .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
-          //   .join(os.EOL);
-          // fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
         } else {
           logger.error('No schema available - not validating.');
           process.exitCode = 1;

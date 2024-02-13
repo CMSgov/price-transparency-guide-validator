@@ -95,10 +95,18 @@ export class DockerManager {
     fs.readdirSync(outputDir).forEach(reportFile => {
       if (reportFile.endsWith('.json') && reportFile != 'errors.json') {
         if (this.outputPath) {
-          fs.copySync(
-            path.join(outputDir, reportFile),
-            path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
-          );
+          if (schemaName === 'in-network-rates' && reportFile === 'negotiatedType.json') {
+            // convert to map
+            this.convertToPopulationMap(
+              path.join(outputDir, reportFile),
+              path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
+            );
+          } else {
+            fs.copySync(
+              path.join(outputDir, reportFile),
+              path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
+            );
+          }
         }
       }
       if (schemaName === 'table-of-contents') {
@@ -133,6 +141,17 @@ export class DockerManager {
         });
       }
     });
+  }
+
+  private convertToPopulationMap(reportFile: string, outputFile: string) {
+    const populationMap = new Map<string, number>();
+    const reportContents = fs.readJsonSync(reportFile);
+    Object.values(reportContents).forEach((v: any) => {
+      if (typeof v === 'string') {
+        populationMap.set(v, (populationMap.get(v) ?? 0) + 1);
+      }
+    });
+    fs.writeJsonSync(outputFile, Object.fromEntries(populationMap.entries()));
   }
 
   buildRunCommand(
