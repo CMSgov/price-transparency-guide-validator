@@ -11,6 +11,7 @@ import { DownloadManager } from './DownloadManager';
 
 const ONE_KILOBYTE = 1024;
 const ONE_MEGABYTE = 1024 * ONE_KILOBYTE;
+const ONE_GIGABYTE = 1024 * ONE_MEGABYTE;
 
 export type ZipContents = {
   zipFile: yauzl.ZipFile;
@@ -194,10 +195,6 @@ export async function validateTocContents(
   downloadManager: DownloadManager
 ): Promise<string[]> {
   temp.track();
-  let tempOutput = '';
-  if (dockerManager.outputPath?.length > 0) {
-    tempOutput = path.join(temp.mkdirSync('contents'), 'contained-result');
-  }
   let providerReferences: Set<string>;
   if (inNetwork.length > 0) {
     if (schemaManager.shouldDetectVersion) {
@@ -205,16 +202,14 @@ export async function validateTocContents(
         inNetwork,
         schemaManager,
         dockerManager,
-        downloadManager,
-        tempOutput
+        downloadManager
       );
     } else {
       providerReferences = await validateInNetworkFixedVersion(
         inNetwork,
         schemaManager,
         dockerManager,
-        downloadManager,
-        tempOutput
+        downloadManager
       );
     }
   }
@@ -224,16 +219,14 @@ export async function validateTocContents(
         allowedAmount,
         schemaManager,
         dockerManager,
-        downloadManager,
-        tempOutput
+        downloadManager
       );
     } else {
       await validateAllowedAmountsFixedVersion(
         allowedAmount,
         schemaManager,
         dockerManager,
-        downloadManager,
-        tempOutput
+        downloadManager
       );
     }
   }
@@ -244,8 +237,7 @@ async function validateInNetworkFixedVersion(
   inNetwork: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  tempOutput: string
+  downloadManager: DownloadManager
 ) {
   const providerReferences: Set<string> = new Set<string>();
   await schemaManager.useSchema('in-network-rates').then(async schemaPath => {
@@ -302,8 +294,7 @@ async function validateInNetworkDetectedVersion(
   inNetwork: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  tempOutput: string
+  downloadManager: DownloadManager
 ) {
   const providerReferences: Set<string> = new Set<string>();
   for (const dataUrl of inNetwork) {
@@ -356,8 +347,7 @@ async function validateAllowedAmountsFixedVersion(
   allowedAmount: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  tempOutput: string
+  downloadManager: DownloadManager
 ) {
   await schemaManager.useSchema('allowed-amounts').then(async schemaPath => {
     if (schemaPath != null) {
@@ -402,8 +392,7 @@ async function validateAllowedAmountsDetectedVersion(
   allowedAmount: string[],
   schemaManager: SchemaManager,
   dockerManager: DockerManager,
-  downloadManager: DownloadManager,
-  tempOutput: string
+  downloadManager: DownloadManager
 ) {
   for (const dataUrl of allowedAmount) {
     if (dockerManager.processedUrls.some(existing => existing.uri === dataUrl)) {
@@ -471,10 +460,6 @@ export async function validateReferencedProviders(
   downloadManager: DownloadManager
 ) {
   temp.track();
-  let tempOutput = '';
-  if (dockerManager.outputPath?.length > 0) {
-    tempOutput = path.join(temp.mkdirSync('providers'), 'contained-result');
-  }
   if (providerReferences.length > 0) {
     await schemaManager.useSchema('provider-reference').then(async schemaPath => {
       if (schemaPath != null) {
@@ -513,25 +498,30 @@ export function writeIndexFile(urls: DockerManager['processedUrls'], outputDir: 
   const schemaSizeTotals = new Map<string, number>();
   const indexContents = urls
     .map((record, index) => {
-      let size: string;
-      if (record.size > ONE_MEGABYTE) {
-        size = `${record.size / ONE_MEGABYTE}MB`;
-      } else if (record.size > ONE_KILOBYTE) {
-        size = `${record.size / ONE_KILOBYTE}KB`;
-      } else {
-        size = `${record.size}B`;
-      }
+      const size = bytesToReadableSize(record.size);
       schemaSizeTotals.set(record.schema, (schemaSizeTotals.get(record.schema) ?? 0) + record.size);
       return `${index + 1}\t${record.schema}\t${record.uri}\t${size}`;
     })
     .join(os.EOL);
   const sizeInfo = [...schemaSizeTotals.entries()]
     .map(([schema, size]) => {
-      return `${schema}: ${size / ONE_MEGABYTE}MB`;
+      return `${schema}: ${bytesToReadableSize(size)}`;
     })
     .join(os.EOL);
   fs.writeFileSync(
     path.join(outputDir, 'result-index.txt'),
     `${indexContents}${os.EOL}${os.EOL}${sizeInfo}`
   );
+}
+
+export function bytesToReadableSize(bytes: number): string {
+  if (bytes > ONE_GIGABYTE) {
+    return `${(bytes / ONE_GIGABYTE).toFixed(2)} GB`;
+  } else if (bytes > ONE_MEGABYTE) {
+    return `${(bytes / ONE_MEGABYTE).toFixed(2)} MB`;
+  } else if (bytes > ONE_KILOBYTE) {
+    return `${bytes / ONE_KILOBYTE} KB`;
+  } else {
+    return `${bytes} B`;
+  }
 }

@@ -36,6 +36,7 @@ async function main() {
       'enable strict checking, which prohibits additional properties in data file'
     )
     .option('-y, --yes-all', 'automatically respond "yes" to confirmation prompts')
+    .option('-z', 'get file sizes for referenced files, but do not validate them')
     .action(validate);
 
   program
@@ -57,6 +58,7 @@ async function main() {
       'enable strict checking, which prohibits additional properties in data file'
     )
     .option('-y, --yes-all', 'automatically respond "yes" to confirmation prompts')
+    .option('-z', 'get file sizes for referenced files, but do not validate them')
     .action((dataUrl, options) => {
       validateFromUrl(dataUrl, options).then(result => {
         if (result) {

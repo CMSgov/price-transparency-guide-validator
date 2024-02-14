@@ -85,7 +85,7 @@ export class SchemaManager {
 
   async determineVersion(dataFile: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      logger.debug(`Detecting version for ${dataFile}`);
+      logger.info(`Detecting version for ${dataFile}`);
       const parser = new JSONParser({ paths: ['$.version'], keepStack: false });
       const dataStream = fs.createReadStream(dataFile);
       let foundVersion = '';
@@ -103,7 +103,7 @@ export class SchemaManager {
         });
         parser.on('close', () => {
           if (foundVersion) {
-            logger.debug(`Found version: ${foundVersion}`);
+            logger.info(`Found version: ${foundVersion}`);
             resolve(foundVersion);
           } else {
             reject('No version property available.');
@@ -137,7 +137,7 @@ export class SchemaManager {
                 const versionMatch = lastText.match(versionRegex);
                 if (versionMatch) {
                   const foundVersion = JSON.parse(versionMatch[1]);
-                  logger.debug(`Found version during backwards search: ${foundVersion}`);
+                  logger.info(`Found version during backwards search: ${foundVersion}`);
                   resolve(foundVersion);
                 } else {
                   reject('No version found during backwards search');

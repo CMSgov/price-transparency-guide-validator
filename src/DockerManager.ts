@@ -1,13 +1,16 @@
-import util, { isArray } from 'util';
+import util from 'util';
 import path from 'path';
 import { exec } from 'child_process';
 import fs from 'fs-extra';
 import temp from 'temp';
 import { logger } from './logger';
+import { bytesToReadableSize } from './utils';
+import { EOL } from 'os';
 
 export class DockerManager {
   containerId = '';
   processedUrls: { uri: string; schema: string; size: number }[] = [];
+  skipRun = false;
 
   constructor(public outputPath = './') {}
 
@@ -37,20 +40,22 @@ export class DockerManager {
         const outputDir = temp.mkdirSync('output');
         const containerOutputPath = path.join(outputDir, 'output.txt');
         const dataSize = fs.statSync(dataPath).size;
-        // copy output files after it finishes
+        this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
+        if (this.skipRun) {
+          return { pass: true };
+        }
         const runCommand = this.buildRunCommand(schemaPath, dataPath, outputDir, schemaName);
         logger.info('Running validator container...');
         logger.debug(runCommand);
         return util
           .promisify(exec)(runCommand)
           .then(() => {
-            this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
             const containerResult: ContainerResult = { pass: true, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
               if (this.outputPath) {
                 fs.copySync(
                   containerOutputPath,
-                  path.join(this.outputPath, `output${this.processedUrls.length}.txt`)
+                  path.join(this.outputPath, `${this.processedUrls.length}-output.txt`)
                 );
               } else {
                 const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
@@ -61,17 +66,18 @@ export class DockerManager {
             this.moveReports(outputDir, schemaName, containerResult);
             return containerResult;
           })
-          .catch((..._zagwo) => {
-            this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
+          .catch(() => {
             const containerResult: ContainerResult = { pass: false, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
+              const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
               if (this.outputPath) {
-                fs.copySync(
-                  containerOutputPath,
-                  path.join(this.outputPath, `output${this.processedUrls.length}.txt`)
+                fs.writeFileSync(
+                  path.join(this.outputPath, `${this.processedUrls.length}-output.txt`),
+                  `${dataUri}${EOL}${bytesToReadableSize(dataSize)}${EOL}${outputText}`
                 );
               } else {
-                const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
+                logger.info(dataUri);
+                logger.info(bytesToReadableSize(dataSize));
                 logger.info(outputText);
               }
             }
@@ -97,7 +103,7 @@ export class DockerManager {
         if (this.outputPath) {
           if (schemaName === 'in-network-rates' && reportFile === 'negotiatedType.json') {
             // convert to map
-            this.convertToPopulationMap(
+            this.writePopulationMap(
               path.join(outputDir, reportFile),
               path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
             );
@@ -143,7 +149,7 @@ export class DockerManager {
     });
   }
 
-  private convertToPopulationMap(reportFile: string, outputFile: string) {
+  private writePopulationMap(reportFile: string, outputFile: string) {
     const populationMap = new Map<string, number>();
     const reportContents = fs.readJsonSync(reportFile);
     Object.values(reportContents).forEach((v: any) => {

@@ -5,7 +5,7 @@ import temp from 'temp';
 import path from 'path';
 import yauzl from 'yauzl';
 import { createGunzip } from 'zlib';
-import { ZipContents, isGzip, isZip } from './utils';
+import { ZipContents, bytesToReadableSize, isGzip, isZip } from './utils';
 import { logger } from './logger';
 
 import { pipeline } from 'stream/promises';
@@ -35,9 +35,7 @@ export class DownloadManager {
           );
         } else if (contentLength > DATA_SIZE_WARNING_THRESHOLD) {
           proceedToDownload = readlineSync.keyInYNStrict(
-            `Data file is ${(contentLength / ONE_MEGABYTE).toFixed(
-              2
-            )} MB in size. Download this file?`
+            `Data file is ${bytesToReadableSize(contentLength)} MB in size. Download this file?`
           );
         } else {
           proceedToDownload = true;

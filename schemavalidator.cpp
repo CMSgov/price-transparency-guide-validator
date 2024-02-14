@@ -241,6 +241,7 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
   static list<string> negotiatedTypePath;
   static list<string> inNetworkProviderGroupsPath;
   static list<string> lastUpdatedPath;
+  static list<string> versionPath;
 
   enum State
   {
@@ -266,16 +267,19 @@ struct MessageHandler : public BaseReaderHandler<UTF8<>, MessageHandler>
                            {.fileName = "negotiatedType.json", .path = negotiatedTypePath},
                            {.fileName = "providerGroups.json", .path = inNetworkProviderGroupsPath},
                            {.fileName = "providerReferences.json", .path = providerReferencePath},
-                           {.fileName = "lastUpdated.json", .path = lastUpdatedPath}};
+                           {.fileName = "lastUpdated.json", .path = lastUpdatedPath},
+                           {.fileName = "version.json", .path = versionPath}};
     }
     else if (name == "allowed-amounts")
     {
-      pathsForReporting = {{.fileName = "lastUpdated.json", .path = lastUpdatedPath}};
+      pathsForReporting = {{.fileName = "lastUpdated.json", .path = lastUpdatedPath},
+                           {.fileName = "version.json", .path = versionPath}};
     }
     else if (name == "table-of-contents")
     {
       pathsForReporting = {{.fileName = "allowedAmountFiles.json", .path = tocAllowedAmountPath},
-                           {.fileName = "inNetworkFiles.json", .path = tocInNetworkPath}};
+                           {.fileName = "inNetworkFiles.json", .path = tocInNetworkPath},
+                           {.fileName = "version.json", .path = versionPath}};
     }
     for (auto &ir : pathsForReporting)
     {
@@ -610,6 +614,7 @@ list<string> MessageHandler::additionalInfoPath = {"in_network", "[]", "negotiat
 list<string> MessageHandler::negotiatedTypePath = {"in_network", "[]", "negotiated_rates", "[]", "negotiated_prices", "[]", "negotiated_type"};
 list<string> MessageHandler::inNetworkProviderGroupsPath = {"in_network", "[]", "negotiated_rates", "[]", "provider_groups"};
 list<string> MessageHandler::lastUpdatedPath = {"last_updated_on"};
+list<string> MessageHandler::versionPath = {"version"};
 
 int main(int argc, char *argv[])
 {

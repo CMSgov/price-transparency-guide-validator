@@ -71,38 +71,33 @@ export async function validate(dataFile: string, options: OptionValues) {
           dataFile,
           `file://${dataFile}`
         );
-        if (containerResult.pass || true) {
-          if (options.target === 'table-of-contents') {
-            const providerReferences = await assessTocContents(
-              containerResult.locations,
-              schemaManager,
-              dockerManager,
-              downloadManager
-            );
-            await assessReferencedProviders(
-              providerReferences,
-              schemaManager,
-              dockerManager,
-              downloadManager
-            );
-          } else if (
-            options.target === 'in-network-rates' &&
-            containerResult.locations?.providerReference?.length > 0
-          ) {
-            await assessReferencedProviders(
-              containerResult.locations.providerReference,
-              schemaManager,
-              dockerManager,
-              downloadManager
-            );
-          }
-          // make index file
-          writeIndexFile(dockerManager.processedUrls, options.out);
-          // const indexContents = dockerManager.processedUrls
-          //   .map(({ uri, schema }, index) => `${index + 1}\t\t${schema}\t\t${uri}`)
-          //   .join(os.EOL);
-          // fs.writeFileSync(path.join(options.out, 'result-index.txt'), indexContents);
+        dockerManager.skipRun = options.z;
+        if (options.target === 'table-of-contents') {
+          const providerReferences = await assessTocContents(
+            containerResult.locations,
+            schemaManager,
+            dockerManager,
+            downloadManager
+          );
+          await assessReferencedProviders(
+            providerReferences,
+            schemaManager,
+            dockerManager,
+            downloadManager
+          );
+        } else if (
+          options.target === 'in-network-rates' &&
+          containerResult.locations?.providerReference?.length > 0
+        ) {
+          await assessReferencedProviders(
+            containerResult.locations.providerReference,
+            schemaManager,
+            dockerManager,
+            downloadManager
+          );
         }
+        // make index file
+        writeIndexFile(dockerManager.processedUrls, options.out);
       } else {
         logger.error('No schema available - not validating.');
         process.exitCode = 1;
@@ -141,31 +136,30 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
               dataFile,
               dataUrl
             );
-            if (containerResult.pass || true) {
-              if (options.target === 'table-of-contents') {
-                const providerReferences = await assessTocContents(
-                  containerResult.locations,
-                  schemaManager,
-                  dockerManager,
-                  downloadManager
-                );
-                await assessReferencedProviders(
-                  providerReferences,
-                  schemaManager,
-                  dockerManager,
-                  downloadManager
-                );
-              } else if (
-                options.target === 'in-network-rates' &&
-                containerResult.locations?.providerReference?.length > 0
-              ) {
-                await assessReferencedProviders(
-                  containerResult.locations.providerReference,
-                  schemaManager,
-                  dockerManager,
-                  downloadManager
-                );
-              }
+            dockerManager.skipRun = options.z;
+            if (options.target === 'table-of-contents') {
+              const providerReferences = await assessTocContents(
+                containerResult.locations,
+                schemaManager,
+                dockerManager,
+                downloadManager
+              );
+              await assessReferencedProviders(
+                providerReferences,
+                schemaManager,
+                dockerManager,
+                downloadManager
+              );
+            } else if (
+              options.target === 'in-network-rates' &&
+              containerResult.locations?.providerReference?.length > 0
+            ) {
+              await assessReferencedProviders(
+                containerResult.locations.providerReference,
+                schemaManager,
+                dockerManager,
+                downloadManager
+              );
             }
             writeIndexFile(dockerManager.processedUrls, options.out);
             return containerResult;
@@ -179,7 +173,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
                 schemaPath,
                 options.target,
                 dataFile.dataPath,
-                `${dataUrl}:${chosenEntry.fileName}` // TODO see if this is actually useful
+                `${dataUrl}:${chosenEntry.fileName}`
               );
               continuation = readlineSync.keyInYNStrict(
                 'Would you like to validate another file in the ZIP?'
