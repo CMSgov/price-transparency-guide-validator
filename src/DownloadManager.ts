@@ -55,6 +55,7 @@ export class DownloadManager {
   }
 
   async downloadDataFile(url: string, folder = this.folder): Promise<string | ZipContents> {
+    this.cleanup();
     const dataPath = path.join(folder, 'data.json');
     return new Promise((resolve, reject) => {
       logger.info('Beginning download...\n');
@@ -155,5 +156,9 @@ export class DownloadManager {
           reject('Error downloading data file.');
         });
     });
+  }
+
+  cleanup(): void {
+    fs.emptyDirSync(this.folder);
   }
 }

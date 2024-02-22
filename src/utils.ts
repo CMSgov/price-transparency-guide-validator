@@ -252,6 +252,10 @@ async function validateInNetworkFixedVersion(
             logger.info(`File: ${dataUrl}`);
             const dataPath = await downloadManager.downloadDataFile(dataUrl);
             if (typeof dataPath === 'string') {
+              if (dockerManager.skipRun) {
+                dockerManager.recordData('in-network-rates', dataPath, dataUrl);
+                continue;
+              }
               // check if detected version matches the provided version
               // if there's no version property, that's ok
               await schemaManager
@@ -275,6 +279,9 @@ async function validateInNetworkFixedVersion(
                   providerReferences.add(prf)
                 );
               }
+            } else {
+              logger.info('Something is amiss with the download');
+              logger.info(dataPath);
             }
           } else {
             logger.error(`Could not download file: ${dataUrl}`);
@@ -307,6 +314,10 @@ async function validateInNetworkDetectedVersion(
         logger.info(`File: ${dataUrl}`);
         const dataPath = await downloadManager.downloadDataFile(dataUrl);
         if (typeof dataPath === 'string') {
+          if (dockerManager.skipRun) {
+            dockerManager.recordData('in-network-rates', dataPath, dataUrl);
+            continue;
+          }
           const versionToUse = await schemaManager.determineVersion(dataPath);
           await schemaManager
             .useVersion(versionToUse)
@@ -361,6 +372,10 @@ async function validateAllowedAmountsFixedVersion(
             logger.info(`File: ${dataUrl}`);
             const dataPath = await downloadManager.downloadDataFile(dataUrl);
             if (typeof dataPath === 'string') {
+              if (dockerManager.skipRun) {
+                dockerManager.recordData('allowed-amounts', dataPath, dataUrl);
+                continue;
+              }
               // check if detected version matches the provided version
               // if there's no version property, that's ok
               await schemaManager
@@ -404,6 +419,10 @@ async function validateAllowedAmountsDetectedVersion(
         logger.info(`File: ${dataUrl}`);
         const dataPath = await downloadManager.downloadDataFile(dataUrl);
         if (typeof dataPath === 'string') {
+          if (dockerManager.skipRun) {
+            dockerManager.recordData('allowed-amounts', dataPath, dataUrl);
+            continue;
+          }
           const versionToUse = await schemaManager.determineVersion(dataPath);
           await schemaManager
             .useVersion(versionToUse)
@@ -473,6 +492,10 @@ export async function validateReferencedProviders(
               logger.info(`File: ${dataUrl}`);
               const dataPath = await downloadManager.downloadDataFile(dataUrl);
               if (typeof dataPath === 'string') {
+                if (dockerManager.skipRun) {
+                  dockerManager.recordData('provider-reference', dataPath, dataUrl);
+                  continue;
+                }
                 const containedResult = await dockerManager.runContainer(
                   schemaPath,
                   'provider-reference',
@@ -508,6 +531,7 @@ export function writeIndexFile(urls: DockerManager['processedUrls'], outputDir: 
       return `${schema}: ${bytesToReadableSize(size)}`;
     })
     .join(os.EOL);
+  logger.info(sizeInfo);
   fs.writeFileSync(
     path.join(outputDir, 'result-index.txt'),
     `${indexContents}${os.EOL}${os.EOL}${sizeInfo}`

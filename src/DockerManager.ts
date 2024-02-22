@@ -42,6 +42,7 @@ export class DockerManager {
         const dataSize = fs.statSync(dataPath).size;
         this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
         if (this.skipRun) {
+          logger.info('skipping run');
           return { pass: true };
         }
         const runCommand = this.buildRunCommand(schemaPath, dataPath, outputDir, schemaName);
@@ -179,6 +180,14 @@ export class DockerManager {
     )}":/output/ ${
       this.containerId
     } "schema/${schemaFile}" "data/${dataFile}" "output/" -s ${schemaName}`;
+  }
+
+  recordData(schemaName: string, dataPath: string, dataUri: string) {
+    if (!this.processedUrls.some(processed => processed.uri === dataUri)) {
+      const dataSize = fs.statSync(dataPath).size;
+      logger.debug(JSON.stringify({ uri: dataUri, schema: schemaName, size: dataSize }));
+      this.processedUrls.push({ uri: dataUri, schema: schemaName, size: dataSize });
+    }
   }
 }
 

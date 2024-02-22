@@ -72,29 +72,33 @@ export async function validate(dataFile: string, options: OptionValues) {
           `file://${dataFile}`
         );
         dockerManager.skipRun = options.z;
-        if (options.target === 'table-of-contents') {
-          const providerReferences = await assessTocContents(
-            containerResult.locations,
-            schemaManager,
-            dockerManager,
-            downloadManager
-          );
-          await assessReferencedProviders(
-            providerReferences,
-            schemaManager,
-            dockerManager,
-            downloadManager
-          );
-        } else if (
-          options.target === 'in-network-rates' &&
-          containerResult.locations?.providerReference?.length > 0
-        ) {
-          await assessReferencedProviders(
-            containerResult.locations.providerReference,
-            schemaManager,
-            dockerManager,
-            downloadManager
-          );
+        try {
+          if (options.target === 'table-of-contents') {
+            const providerReferences = await assessTocContents(
+              containerResult.locations,
+              schemaManager,
+              dockerManager,
+              downloadManager
+            );
+            await assessReferencedProviders(
+              providerReferences,
+              schemaManager,
+              dockerManager,
+              downloadManager
+            );
+          } else if (
+            options.target === 'in-network-rates' &&
+            containerResult.locations?.providerReference?.length > 0
+          ) {
+            await assessReferencedProviders(
+              containerResult.locations.providerReference,
+              schemaManager,
+              dockerManager,
+              downloadManager
+            );
+          }
+        } catch (err) {
+          logger.error(err);
         }
         // make index file
         writeIndexFile(dockerManager.processedUrls, options.out);
