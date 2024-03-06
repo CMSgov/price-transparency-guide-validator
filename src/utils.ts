@@ -142,15 +142,6 @@ function showMenuOptions(currentPage: number, maxPage: number, items: string[]) 
   logger.menu(commandsToShow.join(' | '));
 }
 
-export function appendResults(source: string, destination: string, prefixData: string = '') {
-  try {
-    const sourceData = fs.readFileSync(source);
-    fs.appendFileSync(destination, `${prefixData}${sourceData}`);
-  } catch (err) {
-    logger.error('Problem copying results to output file', err);
-  }
-}
-
 export async function assessTocContents(
   locations: ContainerResult['locations'],
   schemaManager: SchemaManager,
@@ -230,7 +221,11 @@ export async function validateTocContents(
       );
     }
   }
-  return [...providerReferences.values()];
+  if (providerReferences) {
+    return [...providerReferences.values()];
+  } else {
+    return [];
+  }
 }
 
 async function validateInNetworkFixedVersion(
@@ -518,24 +513,24 @@ export async function validateReferencedProviders(
 }
 
 export function writeIndexFile(urls: DockerManager['processedUrls'], outputDir: string) {
-  const schemaSizeTotals = new Map<string, number>();
-  const indexContents = urls
-    .map((record, index) => {
+  const indexPath = path.join(outputDir, 'result-index.txt');
+  try {
+    fs.writeFileSync(indexPath, '');
+    const schemaSizeTotals = new Map<string, number>();
+    urls.forEach((record, index) => {
       const size = bytesToReadableSize(record.size);
       schemaSizeTotals.set(record.schema, (schemaSizeTotals.get(record.schema) ?? 0) + record.size);
-      return `${index + 1}\t${record.schema}\t${record.uri}\t${size}`;
-    })
-    .join(os.EOL);
-  const sizeInfo = [...schemaSizeTotals.entries()]
-    .map(([schema, size]) => {
-      return `${schema}: ${bytesToReadableSize(size)}`;
-    })
-    .join(os.EOL);
-  logger.info(sizeInfo);
-  fs.writeFileSync(
-    path.join(outputDir, 'result-index.txt'),
-    `${indexContents}${os.EOL}${os.EOL}${sizeInfo}`
-  );
+      fs.appendFileSync(indexPath, `${index + 1}\t${record.schema}\t${record.uri}\t${size}`);
+    });
+    const sizeInfo = [...schemaSizeTotals.entries()]
+      .map(([schema, size]) => {
+        return `${schema}: ${bytesToReadableSize(size)}`;
+      })
+      .join(os.EOL);
+    fs.appendFileSync(indexPath, `${os.EOL}${os.EOL}${sizeInfo}`);
+  } catch (err) {
+    logger.error(err);
+  }
 }
 
 export function bytesToReadableSize(bytes: number): string {

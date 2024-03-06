@@ -51,6 +51,7 @@ export class DockerManager {
         return util
           .promisify(exec)(runCommand)
           .then(() => {
+            logger.debug('validator done.');
             const containerResult: ContainerResult = { pass: true, locations: {} };
             if (fs.existsSync(containerOutputPath)) {
               if (this.outputPath) {
@@ -68,20 +69,32 @@ export class DockerManager {
             return containerResult;
           })
           .catch(() => {
+            logger.debug('validator done.');
             const containerResult: ContainerResult = { pass: false, locations: {} };
-            if (fs.existsSync(containerOutputPath)) {
-              const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
-              if (this.outputPath) {
-                fs.writeFileSync(
-                  path.join(this.outputPath, `${this.processedUrls.length}-output.txt`),
-                  `${dataUri}${EOL}${bytesToReadableSize(dataSize)}${EOL}${outputText}`
-                );
-              } else {
-                logger.info(dataUri);
-                logger.info(bytesToReadableSize(dataSize));
-                logger.info(outputText);
+            try {
+              if (fs.existsSync(containerOutputPath)) {
+                const outputText = fs.readFileSync(containerOutputPath, 'utf-8');
+                if (this.outputPath) {
+                  fs.writeFileSync(
+                    path.join(this.outputPath, `${this.processedUrls.length}-output.txt`),
+                    `${dataUri}${EOL}${bytesToReadableSize(dataSize)}${EOL}${outputText}`
+                  );
+                } else {
+                  logger.info(dataUri);
+                  logger.info(bytesToReadableSize(dataSize));
+                  logger.info(outputText);
+                }
               }
+            } catch (err) {
+              logger.error(err);
+              logger.info(dataUri);
+              logger.info(bytesToReadableSize(dataSize));
+              fs.copyFileSync(
+                containerOutputPath,
+                path.join(this.outputPath, `${this.processedUrls.length}-output.txt`)
+              );
             }
+
             this.moveReports(outputDir, schemaName, containerResult);
             process.exitCode = 1;
             return containerResult;
@@ -100,65 +113,75 @@ export class DockerManager {
 
   private moveReports(outputDir: string, schemaName: string, containerResult: ContainerResult) {
     fs.readdirSync(outputDir).forEach(reportFile => {
-      if (reportFile.endsWith('.json') && reportFile != 'errors.json') {
-        if (this.outputPath) {
-          if (schemaName === 'in-network-rates' && reportFile === 'negotiatedType.json') {
-            // convert to map
-            this.writePopulationMap(
-              path.join(outputDir, reportFile),
-              path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
-            );
-          } else {
-            fs.copySync(
-              path.join(outputDir, reportFile),
-              path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
-            );
+      try {
+        logger.debug(`moving report ${reportFile}`);
+        if (reportFile.endsWith('.json') && reportFile != 'errors.json') {
+          if (this.outputPath) {
+            if (schemaName === 'in-network-rates' && reportFile === 'negotiatedType.json') {
+              // convert to map
+              this.writePopulationMap(
+                path.join(outputDir, reportFile),
+                path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
+              );
+            } else {
+              fs.copySync(
+                path.join(outputDir, reportFile),
+                path.join(this.outputPath, `${this.processedUrls.length}-${reportFile}`)
+              );
+            }
           }
         }
-      }
-      if (schemaName === 'table-of-contents') {
-        if (reportFile === 'allowedAmountFiles.json') {
-          const allowedAmountFiles = fs.readJsonSync(path.join(outputDir, reportFile));
-          containerResult.locations.allowedAmount = [];
-          Object.keys(allowedAmountFiles).forEach((key: string) => {
-            if (typeof allowedAmountFiles[key].location === 'string') {
-              containerResult.locations.allowedAmount.push(allowedAmountFiles[key].location);
-            }
-          });
-        } else if (reportFile === 'inNetworkFiles.json') {
-          const inNetworkFiles = fs.readJsonSync(path.join(outputDir, reportFile));
-          containerResult.locations.inNetwork = [];
-          Object.keys(inNetworkFiles).forEach((key: string) => {
-            if (Array.isArray(inNetworkFiles[key])) {
-              inNetworkFiles[key].forEach((entry: any) => {
-                if (typeof entry.location === 'string') {
-                  containerResult.locations.inNetwork.push(entry.location);
-                }
-              });
+        if (schemaName === 'table-of-contents') {
+          if (reportFile === 'allowedAmountFiles.json') {
+            const allowedAmountFiles = fs.readJsonSync(path.join(outputDir, reportFile));
+            containerResult.locations.allowedAmount = [];
+            Object.keys(allowedAmountFiles).forEach((key: string) => {
+              if (typeof allowedAmountFiles[key].location === 'string') {
+                containerResult.locations.allowedAmount.push(allowedAmountFiles[key].location);
+              }
+            });
+          } else if (reportFile === 'inNetworkFiles.json') {
+            const inNetworkFiles = fs.readJsonSync(path.join(outputDir, reportFile));
+            containerResult.locations.inNetwork = [];
+            Object.keys(inNetworkFiles).forEach((key: string) => {
+              if (Array.isArray(inNetworkFiles[key])) {
+                inNetworkFiles[key].forEach((entry: any) => {
+                  if (typeof entry.location === 'string') {
+                    containerResult.locations.inNetwork.push(entry.location);
+                  }
+                });
+              }
+            });
+          }
+        } else if (schemaName === 'in-network-rates' && reportFile === 'providerReferences.json') {
+          const providerReferenceFiles = fs.readJsonSync(path.join(outputDir, reportFile));
+          containerResult.locations.providerReference = [];
+          Object.keys(providerReferenceFiles).forEach((key: string) => {
+            if (typeof providerReferenceFiles[key] === 'string') {
+              containerResult.locations.providerReference.push(providerReferenceFiles[key]);
             }
           });
         }
-      } else if (schemaName === 'in-network-rates' && reportFile === 'providerReferences.json') {
-        const providerReferenceFiles = fs.readJsonSync(path.join(outputDir, reportFile));
-        containerResult.locations.providerReference = [];
-        Object.keys(providerReferenceFiles).forEach((key: string) => {
-          if (typeof providerReferenceFiles[key] === 'string') {
-            containerResult.locations.providerReference.push(providerReferenceFiles[key]);
-          }
-        });
+      } catch (err) {
+        logger.error(`problem moving report ${reportFile}: ${err}`);
       }
     });
   }
 
   private writePopulationMap(reportFile: string, outputFile: string) {
-    const populationMap = new Map<string, number>();
-    const reportContents = fs.readJsonSync(reportFile);
-    Object.values(reportContents).forEach((v: any) => {
-      if (typeof v === 'string') {
-        populationMap.set(v, (populationMap.get(v) ?? 0) + 1);
-      }
-    });
-    fs.writeJsonSync(outputFile, Object.fromEntries(populationMap.entries()));
+    try {
+      const populationMap = new Map<string, number>();
+      const reportContents = fs.readJsonSync(reportFile);
+      Object.values(reportContents).forEach((v: any) => {
+        if (typeof v === 'string') {
+          populationMap.set(v, (populationMap.get(v) ?? 0) + 1);
+        }
+      });
+      fs.writeJsonSync(outputFile, Object.fromEntries(populationMap.entries()));
+    } catch (err) {
+      logger.error(`population map problem: ${err}`);
+      fs.copyFileSync(reportFile, outputFile);
+    }
   }
 
   buildRunCommand(
