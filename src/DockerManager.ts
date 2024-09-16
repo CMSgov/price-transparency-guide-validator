@@ -55,7 +55,7 @@ export class DockerManager {
             if (fs.existsSync(containerLocationPath)) {
               try {
                 containerResult.locations = fs.readJsonSync(containerLocationPath);
-              } catch (err) {
+              } catch {
                 // something went wrong when reading the location file that the validator produced
               }
             }

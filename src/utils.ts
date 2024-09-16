@@ -69,9 +69,7 @@ export function isGzip(contentType: string, url: string): boolean {
 }
 
 export function isZip(contentType: string, url: string): boolean {
-  return (
-    contentType === 'application/zip' || /\.zip(\?|$)/.test(url)
-  );
+  return contentType === 'application/zip' || /\.zip(\?|$)/.test(url);
 }
 
 export function chooseJsonFile(entries: yauzl.Entry[]): yauzl.Entry {
@@ -445,7 +443,7 @@ async function validateAllowedAmountsDetectedVersion(
                 );
               }
             })
-            .then(_containedResult => {
+            .then(() => {
               if (tempOutput.length > 0) {
                 appendResults(
                   tempOutput,
@@ -509,7 +507,7 @@ export async function validateReferencedProviders(
               logger.info(`File: ${dataUrl}`);
               const dataPath = await downloadManager.downloadDataFile(dataUrl);
               if (typeof dataPath === 'string') {
-                const containedResult = await dockerManager.runContainer(
+                await dockerManager.runContainer(
                   schemaPath,
                   'provider-reference',
                   dataPath,

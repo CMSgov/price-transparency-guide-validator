@@ -38,7 +38,7 @@ export async function validate(dataFile: string, options: OptionValues) {
       );
     }
     versionToUse = schemaManager.shouldDetectVersion ? detectedVersion : options.schemaVersion;
-  } catch (err) {
+  } catch {
     if (!schemaManager.shouldDetectVersion) {
       versionToUse = options.schemaVersion;
     } else {
