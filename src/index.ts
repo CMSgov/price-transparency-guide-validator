@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { program, Option } from 'commander';
+import { Command, Option } from 'commander';
 import { validate, update, validateFromUrl } from './commands';
 import { config } from './utils';
 import { logger } from './logger';
@@ -10,7 +10,7 @@ main().catch(error => {
 });
 
 async function main() {
-  program
+  const program = new Command()
     .name('cms-mrf-validator')
     .description('Tool for validating health coverage machine-readable files.')
     .option('-d, --debug', 'show debug output')
@@ -19,7 +19,9 @@ async function main() {
         logger.level = 'debug';
         logger.debug(process.argv.join(' '));
       }
-    })
+    });
+
+  program
     .command('validate')
     .description('Validate a file against a specific published version of a CMS schema.')
     .usage('<data-file> [options]')

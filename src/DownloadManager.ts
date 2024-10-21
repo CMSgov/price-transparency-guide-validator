@@ -154,7 +154,7 @@ export class DownloadManager {
             }
           }
         })
-        .catch(reason => {
+        .catch(() => {
           reject('Error downloading data file.');
         });
     });
