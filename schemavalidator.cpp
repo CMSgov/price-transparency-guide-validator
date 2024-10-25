@@ -282,6 +282,7 @@ int main(int argc, char *argv[])
   string outputPath;
   int bufferSize = 4069;
   string schemaName;
+  bool failFast;
 
   try
   {
@@ -291,17 +292,20 @@ int main(int argc, char *argv[])
     TCLAP::ValueArg<string> outputArg("o", "output-path", "path to output directory", false, "/output", "path");
     TCLAP::ValueArg<int> bufferArg("b", "buffer-size", "buffer size in bytes", false, 4069, "integer");
     TCLAP::ValueArg<string> schemaNameArg("s", "schema-name", "schema name", false, "", "string");
+    TCLAP::SwitchArg failFastArg("f", "fail-fast", "if set, stop validating after the first error");
     cmd.add(schemaArg);
     cmd.add(dataArg);
     cmd.add(outputArg);
     cmd.add(bufferArg);
     cmd.add(schemaNameArg);
+    cmd.add(failFastArg);
     cmd.parse(argc, argv);
     schemaPath = schemaArg.getValue();
     dataPath = dataArg.getValue();
     outputPath = outputArg.getValue();
     bufferSize = bufferArg.getValue();
     schemaName = schemaNameArg.getValue();
+    failFast = failFastArg.getValue();
   }
   catch (TCLAP::ArgException &e)
   {
@@ -383,6 +387,12 @@ int main(int argc, char *argv[])
   // SchemaValidator validator(sd);
   MessageHandler handler(schemaName);
   GenericSchemaValidator<SchemaDocument, MessageHandler> validator(sd, handler);
+
+  if (!failFast)
+  {
+    validator.SetValidateFlags(kValidateContinueOnErrorFlag);
+  }
+
   Reader reader;
   FILE *fp2 = fopen(dataPath.c_str(), "r");
   if (!fp2)

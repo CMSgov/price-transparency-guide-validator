@@ -27,6 +27,7 @@ async function main() {
     .usage('<data-file> [options]')
     .argument('<data-file>', 'path to data file to validate')
     .option('--schema-version <version>', 'version of schema to use for validation')
+    .option('-f, --fail-fast', 'quit validating file after the first error is encountered')
     .option('-o, --out <out>', 'output path')
     .addOption(
       new Option('-t, --target <schema>', 'name of schema to use')
@@ -48,6 +49,7 @@ async function main() {
     .usage('<data-url> [options]')
     .argument('<data-url>', 'URL to data file to validate')
     .option('--schema-version <version>', 'version of schema to use for validation')
+    .option('-f', 'quit validating file after the first error is encountered')
     .option('-o, --out <out>', 'output path')
     .addOption(
       new Option('-t, --target <schema>', 'name of schema to use')

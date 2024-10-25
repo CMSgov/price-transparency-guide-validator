@@ -29,6 +29,7 @@ export async function validate(dataFile: string, options: OptionValues) {
   await schemaManager.ensureRepo();
   schemaManager.strict = options.strict;
   schemaManager.shouldDetectVersion = options.schemaVersion == null;
+  schemaManager.isFailFast = options.failFast;
   let versionToUse: string;
   try {
     const detectedVersion = await schemaManager.determineVersion(dataFile);
