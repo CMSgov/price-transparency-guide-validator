@@ -45,15 +45,24 @@ export class SchemaManager {
       .split('\n')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0)
-      .flatMap(tag => tag.startsWith('v') ? [tag, tag.slice(1)] : [tag]); // Adds both "vX.Y.Z" and "X.Y.Z" formats
-    if (tags.includes(version)) {
-      await util.promisify(exec)(`git -C "${this.repoDirectory}" checkout ${version}`);
-      this._version = version;
+      .reduce((acc, tag) => {
+        if (tag.startsWith('v')) {
+          acc[tag] = tag; // Key with 'v' prefix
+          acc[tag.slice(1)] = tag; // Key without 'v' prefix
+        } else {
+          acc[tag] = 'v' + tag; // If no 'v' prefix, add one as the value
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
+    if (version in tags) {
+      await util.promisify(exec)(`git -C "${this.repoDirectory}" checkout ${tags[version]}`);
+      this._version = tags[version];
       return true;
     } else {
       // we didn't find your tag. maybe you mistyped it, so show the available ones.
       throw new Error(
-        `Could not find a schema version named "${version}". Available versions are:\n${tags.join(
+        `Could not find a schema version named "${version}". Available versions are:\n${Object.keys(tags).join(
           '\n'
         )}`
       );
