@@ -44,7 +44,8 @@ export class SchemaManager {
     const tags = tagResult.stdout
       .split('\n')
       .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
+      .filter(tag => tag.length > 0)
+      .flatMap(tag => tag.startsWith('v') ? [tag, tag.slice(1)] : [tag]); // Adds both "vX.Y.Z" and "X.Y.Z" formats
     if (tags.includes(version)) {
       await util.promisify(exec)(`git -C "${this.repoDirectory}" checkout ${version}`);
       this._version = version;
