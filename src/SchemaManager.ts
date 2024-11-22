@@ -45,15 +45,18 @@ export class SchemaManager {
       .split('\n')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0)
-      .reduce((acc, tag) => {
-        if (tag.startsWith('v')) {
-          acc[tag] = tag; // Key with 'v' prefix
-          acc[tag.slice(1)] = tag; // Key without 'v' prefix
-        } else {
-          acc[tag] = 'v' + tag; // If no 'v' prefix, add one as the value
-        }
-        return acc;
-      }, {} as Record<string, string>);
+      .reduce(
+        (acc, tag) => {
+          if (tag.startsWith('v')) {
+            acc[tag] = tag; // Key with 'v' prefix
+            acc[tag.slice(1)] = tag; // Key without 'v' prefix
+          } else {
+            acc[tag] = 'v' + tag; // If no 'v' prefix, add one as the value
+          }
+          return acc;
+        },
+        {} as Record<string, string>
+      );
 
     if (version in tags) {
       await util.promisify(exec)(`git -C "${this.repoDirectory}" checkout ${tags[version]}`);
@@ -62,9 +65,9 @@ export class SchemaManager {
     } else {
       // we didn't find your tag. maybe you mistyped it, so show the available ones.
       throw new Error(
-        `Could not find a schema version named "${version}". Available versions are:\n${Object.keys(tags).join(
-          '\n'
-        )}`
+        `Could not find a schema version named "${version}". Available versions are:\n${Object.keys(
+          tags
+        ).join('\n')}`
       );
     }
   }

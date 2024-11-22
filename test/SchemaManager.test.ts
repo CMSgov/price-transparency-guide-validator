@@ -108,7 +108,7 @@ describe('SchemaManager', () => {
       await expect(schemaManager.useVersion('v0.7')).resolves.toBe(true);
     });
 
-    it('should resolve to true when the version exists in the repo2', async () => {
+    it('should resolve to true when the version exists in the repo with a prefixed v', async () => {
       const schemaManager = new SchemaManager(repoDirectory);
       await expect(schemaManager.useVersion('0.7')).resolves.toBe(true);
     });
@@ -118,11 +118,10 @@ describe('SchemaManager', () => {
       await expect(schemaManager.useVersion('v0.6')).toReject();
     });
 
-    it('should reject when the version does not exist in the repo2', async () => {
+    it('should reject when the version does not exist in the repo with a prefixed v', async () => {
       const schemaManager = new SchemaManager(repoDirectory);
       await expect(schemaManager.useVersion('0.6')).toReject();
     });
-
   });
 
   describe('#useSchema', () => {
