@@ -38,6 +38,7 @@ async function main() {
       'enable strict checking, which prohibits additional properties in data file'
     )
     .option('-y, --yes-all', 'automatically respond "yes" to confirmation prompts')
+    .option('-a, --all-errors', 'continue validating after errors are found')
     .action(validate);
 
   program
@@ -59,6 +60,7 @@ async function main() {
       'enable strict checking, which prohibits additional properties in data file'
     )
     .option('-y, --yes-all', 'automatically respond "yes" to confirmation prompts')
+    .option('-a, --all-errors', 'continue validating after errors are found')
     .action((dataUrl, options) => {
       validateFromUrl(dataUrl, options).then(result => {
         if (result) {

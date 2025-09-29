@@ -60,7 +60,7 @@ export async function validate(dataFile: string, options: OptionValues) {
     .then(async schemaPath => {
       temp.track();
       if (schemaPath != null) {
-        const dockerManager = new DockerManager(options.out);
+        const dockerManager = new DockerManager(options.out, options.allErrors);
         const downloadManager = new DownloadManager(options.yesAll);
         const containerResult = await dockerManager.runContainer(
           schemaPath,
@@ -121,7 +121,7 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
       })
       .then(async schemaPath => {
         if (schemaPath != null) {
-          const dockerManager = new DockerManager(options.out);
+          const dockerManager = new DockerManager(options.out, options.allErrors);
           const dataFile = await downloadManager.downloadDataFile(dataUrl);
           if (typeof dataFile === 'string') {
             const containerResult = await dockerManager.runContainer(

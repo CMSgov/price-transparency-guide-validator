@@ -8,7 +8,10 @@ import { logger } from './logger';
 export class DockerManager {
   containerId = '';
 
-  constructor(public outputPath = '') {}
+  constructor(
+    public outputPath = '',
+    public allErrors = false
+  ) {}
 
   private async initContainerId(): Promise<void> {
     this.containerId = await util
@@ -99,11 +102,12 @@ export class DockerManager {
     const absoluteDataPath = path.resolve(dataPath);
     const dataDir = path.dirname(absoluteDataPath);
     const dataFile = path.basename(absoluteDataPath);
+    const failFastArg = this.allErrors ? '' : ' -f';
     return `docker run --rm -v "${schemaDir}":/schema/ -v "${dataDir}":/data/ -v "${path.resolve(
       outputDir
     )}":/output/ ${
       this.containerId
-    } "schema/${schemaFile}" "data/${dataFile}" -o "output/" -s ${schemaName}`;
+    } "schema/${schemaFile}" "data/${dataFile}" -o "output/" -s ${schemaName}${failFastArg}`;
   }
 }
 

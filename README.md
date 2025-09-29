@@ -119,6 +119,7 @@ Options:
                               default: "in-network-rates")
   -s, --strict                enable strict checking, which prohibits additional properties in data file
   -y, --yes-all               automatically respond "yes" to confirmation prompts
+  -a, --all-errors            continue validating after errors are found
   -h, --help                  display help for command
 ```
 
@@ -153,6 +154,7 @@ Options:
                               default: "in-network-rates")
   -s, --strict                enable strict checking, which prohibits additional properties in data file
   -y, --yes-all               automatically respond "yes" to confirmation prompts
+  -a, --all-errors            continue validating after errors are found
   -h, --help                  display help for command
 ```
 
