@@ -38,8 +38,8 @@ export async function validate(dataFile: string, options: OptionValues) {
       );
     }
     versionToUse = schemaManager.shouldDetectVersion ? detectedVersion : options.schemaVersion;
-    if (/^v?2\.0\.0$/.test(versionToUse)) {
-      logger.info('v2.0.0 has some problems with the tooling. Using v2.1.0 instead.');
+    if (/^v?2\.0\.[01]$/.test(versionToUse)) {
+      logger.info('v2.0.0 and v2.0.1 has some problems with the tooling. Using v2.1.0 instead.');
       versionToUse = 'v2.1.0';
     }
   } catch {
@@ -117,8 +117,8 @@ export async function validateFromUrl(dataUrl: string, options: OptionValues) {
     await schemaManager.ensureRepo();
     schemaManager.strict = options.strict;
     let versionToUse: string = options.schemaVersion;
-    if (/^v?2\.0\.0$/.test(versionToUse)) {
-      logger.info('v2.0.0 has some problems with the tooling. Using v2.1.0 instead.');
+    if (/^v?2\.0\.[01]$/.test(versionToUse)) {
+      logger.info('v2.0.0 and v2.0.1 has some problems with the tooling. Using v2.1.0 instead.');
       versionToUse = 'v2.1.0';
     }
     return schemaManager
