@@ -209,9 +209,9 @@ Error report:
 }
 ```
 
-### Known Validator Issues for Transparency in Coverage Schema Version 2.0.0
+### Known Validator Issues for Transparency in Coverage Schema Versions 2.0.0 and 2.0.1
 
-This validator uses the [RapidJSON](https://rapidjson.org) library, which has a [known issue](https://github.com/Tencent/rapidjson/issues/2314) with JSON Schema validation of `oneOf` and `const` keywords. To work around this, @clovis517 introduced a [schema patch](https://github.com/CMSgov/price-transparency-guide/pull/897/changes/23972ca27428fc675bf315b661675eeeee85e9f0) that preserves the expected validation behavior while avoiding the RapidJSON limitations. As a result, this validator automatically translates `--schema-version v2.0.0` to `--schema-version v2.1.0`.
+This validator uses the [RapidJSON](https://rapidjson.org) library, which has a [known issue](https://github.com/Tencent/rapidjson/issues/2314) with JSON Schema validation of `oneOf` and `const` keywords. To work around this, @clovis517 introduced a [schema patch](https://github.com/CMSgov/price-transparency-guide/pull/897/changes/23972ca27428fc675bf315b661675eeeee85e9f0) that preserves the expected validation behavior while avoiding the RapidJSON limitations. As a result, this validator automatically translates versions 2.0.0 and 2.0.1 to version 2.1.0. This happens whether the version is passed via a CLI flag (e.g., `--schema-version v2.0.0`) or detected automatically within the machine-readable file.
 
 ### Performance Considerations
 
