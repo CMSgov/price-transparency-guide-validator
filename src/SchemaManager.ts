@@ -145,7 +145,7 @@ export class SchemaManager {
                 length: BACKWARDS_BYTES
               });
               if (lastStuff.bytesRead > 0) {
-                const lastText = lastStuff.buffer.toString('utf-8');
+                const lastText = lastStuff.buffer.toString();
                 const versionRegex = /"version"\s*:\s*("(?:\\"|\\\\|[^"])*")/;
                 const versionMatch = lastText.match(versionRegex);
                 if (versionMatch) {
