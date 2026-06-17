@@ -423,7 +423,11 @@ async function validateAllowedAmountsDetectedVersion(
         logger.info(`File: ${dataUrl}`);
         const dataPath = await downloadManager.downloadDataFile(dataUrl);
         if (typeof dataPath === 'string') {
-          const versionToUse = await schemaManager.determineVersion(dataPath);
+          let versionToUse = await schemaManager.determineVersion(dataPath);
+          if (/^v?2\.0\.[01]$/.test(versionToUse)) {
+            logger.info('v2.0.0 and v2.0.1 has some problems with the tooling. Using v2.1.0 instead.');
+            versionToUse = 'v2.1.0';
+          }
           await schemaManager
             .useVersion(versionToUse)
             .then(versionIsAvailable => {
